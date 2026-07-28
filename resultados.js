@@ -1,4 +1,5 @@
 const resultsList = document.querySelector("#results-list");
+const resultSyncStatus = document.querySelector("#result-sync-status");
 let displayedResults = [];
 
 function escapeResult(value) { return String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#039;", '"': "&quot;" })[char]); }
@@ -42,12 +43,20 @@ resultsList.addEventListener("click", async (event) => {
 
 async function loadResults() {
   const localResults = window.quickGameStore.getResults();
-  await Promise.all(localResults.map((result) => window.quickGameStore.saveResultToCloud(result)));
+  const syncResponses = await Promise.all(localResults.map((result) => window.quickGameStore.saveResultToCloud(result)));
   const { data: cloudResults, error } = await window.quickGameStore.getCloudResults();
   const merged = [...cloudResults, ...localResults.filter((local) => !cloudResults.some((cloud) => cloud.id === local.id))]
     .sort((a, b) => new Date(b.finishedAt) - new Date(a.finishedAt));
   renderResults(merged);
-  if (error && !merged.length) console.warn("Resultados do Supabase indisponíveis.", error);
+  const syncError = syncResponses.find((response) => response?.error)?.error;
+  if (error || syncError) {
+    resultSyncStatus.textContent = "Não foi possível sincronizar com o Supabase. Verifique se o script supabase-schema.sql foi executado no projeto.";
+    resultSyncStatus.className = "result-sync-status is-error";
+    console.warn("Resultados do Supabase indisponíveis.", error || syncError);
+  } else {
+    resultSyncStatus.textContent = cloudResults.length ? "Resultados sincronizados com sua conta." : "";
+    resultSyncStatus.className = "result-sync-status";
+  }
 }
 
 loadResults();

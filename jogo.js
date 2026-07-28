@@ -185,11 +185,12 @@ function renderOverview() {
   overviewRounds.innerHTML = quickSchedule.map((round, index) => `<article class="round overview-round ${index === currentRound ? "is-current" : ""}"><header class="round-title">Rodada ${index + 1}<span>${index === currentRound ? "ATUAL" : index < currentRound ? "CONCLUÍDA" : "AGUARDANDO"}</span></header>${round.matches.map(([home, away], gameIndex) => { const result = scores.get(scoreKey(index, gameIndex)); return `<div class="match overview-match"><span>${escapeQuick(home)}</span><span class="overview-score">${result && result[0] !== "" && result[1] !== "" ? `${result[0]} × ${result[1]}` : "×"}</span><span class="team-away">${escapeQuick(away)}</span></div>`; }).join("")}${round.bye ? `<div class="bye">Folga: <strong>${escapeQuick(round.bye)}</strong></div>` : ""}</article>`).join("");
 }
 
-function finishQuickGame(message) {
+async function finishQuickGame(message) {
   const standings = buildStandings();
   const result = { id: Date.now(), finishedAt: new Date().toISOString(), reason: message, standings, schedule: quickSchedule, scores: [...scores.entries()] };
   window.quickGameStore.addResult(result);
-  window.quickGameStore.saveResultToCloud(result).catch((error) => console.warn("Não foi possível salvar o resultado no Supabase.", error));
+  const { error } = await window.quickGameStore.saveResultToCloud(result);
+  if (error) console.warn("Não foi possível salvar o resultado no Supabase.", error);
   window.quickGameStore.clearActive();
   quickGame.hidden = true; overview.hidden = true; quickFinished.hidden = false;
   document.querySelector("#finished-copy").textContent = message;
