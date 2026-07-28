@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vôlei Hub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="app-loading" data-theme="dark">
+    <main class="page-shell">
+      <div class="table-top-actions">
+        <img class="table-logo" data-theme-logo src="assets/logo_escuro.png" alt="Vôlei Hub" />
+        <button class="theme-button" type="button" data-theme-toggle aria-pressed="true">☀</button>
+      </div>
+      <section class="hero" aria-labelledby="page-title">
+        <p class="eyebrow">GERADOR DE TABELA</p>
+        <h1 id="page-title">Vôlei Hub</h1>
+        <p class="hero-text">Monte uma tabela equilibrada: cada equipe joga uma vez por rodada e as folgas são distribuídas entre os times.</p>
+      </section>
+
+      <section class="setup-card" aria-label="Configuração do campeonato">
+        <div class="settings-row">
+          <p class="eyebrow">CONFIGURAÇÃO DO TORNEIO</p>
+          <button id="settings-toggle" class="settings-button" type="button" aria-label="Abrir configurações" aria-expanded="false">⚙</button>
+        </div>
+        <div id="settings-panel" class="settings-panel" hidden>
+          <label class="switch-label" for="unlimited-rounds">
+            <input id="unlimited-rounds" type="checkbox" />
+            <span>
+              <strong>Sem limite de rodadas</strong>
+              <small>Permite qualquer quantidade de rodadas. Fora dos blocos de turno e retorno, confrontos poderão se repetir.</small>
+            </span>
+          </label>
+        </div>
+        <div class="field-row">
+          <div class="field-group">
+            <label for="team-count">Quantidade de times</label>
+            <select id="team-count" aria-label="Quantidade de times">
+              <option value="3">3 times</option>
+              <option value="4">4 times</option>
+              <option value="5" selected>5 times</option>
+              <option value="6">6 times</option>
+              <option value="7">7 times</option>
+              <option value="8">8 times</option>
+            </select>
+          </div>
+          <div class="field-group compact-field">
+            <label for="round-count">Rodadas do jogo</label>
+            <input id="round-count" type="number" min="1" max="99" value="1" />
+          </div>
+          <div class="field-group compact-field">
+            <label for="player-count">Pessoas por time</label>
+            <select id="player-count" aria-label="Quantidade de pessoas por time">
+              <option value="3">3 pessoas</option>
+              <option value="4" selected>4 pessoas</option>
+              <option value="5">5 pessoas</option>
+              <option value="6">6 pessoas</option>
+            </select>
+          </div>
+          <button id="generate-button" type="button">Gerar tabela</button>
+        </div>
+        <div class="names-toggle-row">
+          <p>Defina os nomes das equipes e, se quiser, cadastre os participantes.</p>
+          <button id="players-toggle" class="secondary-button" type="button" aria-expanded="false">Cadastrar participantes</button>
+        </div>
+        <div id="team-names" class="team-names" aria-live="polite"></div>
+        <div id="players-panel" class="players-panel" hidden aria-label="Nomes dos participantes"></div>
+      </section>
+
+      <section id="schedule-section" class="schedule-section" aria-live="polite">
+        <div class="schedule-heading">
+          <div>
+            <p class="eyebrow">CALENDÁRIO</p>
+            <h2>Partidas por rodada</h2>
+          </div>
+          <div id="schedule-summary" class="summary"></div>
+        </div>
+        <div id="rounds" class="rounds"></div>
+        <a class="home-button" href="index.html" aria-label="Retornar ao menu principal"><span aria-hidden="true">⌂</span> Menu principal</a>
+      </section>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="theme.js"></script>
+    <script src="table-auth.js"></script>
+    <script src="java.js"></script>
+  </body>
+</html>

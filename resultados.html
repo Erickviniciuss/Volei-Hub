@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Resultados | Vôlei Hub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="app-loading" data-theme="dark">
+    <main class="page-shell results-shell">
+      <div class="table-top-actions"><img class="table-logo" data-theme-logo src="assets/logo_escuro.png" alt="Vôlei Hub" /><button class="theme-button" type="button" data-theme-toggle aria-pressed="true">☀</button></div>
+      <section class="hero"><p class="eyebrow">HISTÓRICO</p><h1>Resultados</h1><p class="hero-text">Consulte as partidas encerradas e suas classificações finais.</p></section>
+      <section id="results-list" class="results-list"></section>
+      <a class="home-button" href="index.html"><span aria-hidden="true">⌂</span> Menu principal</a>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script><script src="theme.js"></script><script src="table-auth.js"></script><script src="game-storage.js"></script><script src="resultados.js"></script>
+  </body>
+</html>

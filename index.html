@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Menu principal | Vôlei Hub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="app-loading" data-theme="dark">
+    <main class="menu-shell">
+      <aside class="sidebar" aria-label="Menu do sistema">
+        <a class="brand" href="index.html">VÔLEI<br /><span>HUB</span></a>
+        <img class="sidebar-logo" data-theme-logo src="assets/logo_escuro.png" alt="Vôlei Hub" />
+        <nav class="system-nav">
+          <a class="nav-item is-active" href="tabela.htm"><span aria-hidden="true">▦</span> Tabela</a>
+          <a class="nav-item" href="jogo.html"><span aria-hidden="true">▶</span> Jogo Rápido</a>
+          <a class="nav-item" href="resultados.html"><span aria-hidden="true">★</span> Resultados</a>
+        </nav>
+        <details id="current-game-menu" class="current-game-menu" hidden>
+          <summary>Partida atual</summary>
+          <div id="current-game-info"></div>
+        </details>
+        <button id="logout-button" class="sidebar-action" type="button">↩ Voltar ao login</button>
+      </aside>
+      <section class="menu-content">
+        <header class="menu-header">
+          <div class="account-card">
+            <strong id="account-name">Carregando…</strong>
+            <span id="account-email"></span>
+            <div class="account-actions">
+              <button id="edit-account-button" type="button">Editar cadastro</button>
+              <button id="theme-toggle" type="button" aria-pressed="true">☀</button>
+            </div>
+          </div>
+          <div>
+            <p class="eyebrow">PAINEL PRINCIPAL</p>
+            <h1>Seu campeonato<br />começa aqui.</h1>
+          </div>
+        </header>
+        <section class="menu-welcome">
+          <p class="eyebrow">PRÓXIMO PASSO</p>
+          <h2>Monte sua tabela de jogos</h2>
+          <p>Defina as equipes, os participantes e as rodadas do seu campeonato.</p>
+          <a class="start-table-button" href="tabela.htm">Abrir tabela <span aria-hidden="true">→</span></a>
+        </section>
+      </section>
+    </main>
+
+    <dialog id="account-dialog" class="account-dialog">
+      <form id="account-form" method="dialog">
+        <div class="dialog-heading">
+          <div><p class="eyebrow">MINHA CONTA</p><h2>Editar cadastro</h2></div>
+          <button id="close-dialog" class="dialog-close" type="button" aria-label="Fechar">×</button>
+        </div>
+        <label for="account-edit-name">Nome da conta</label>
+        <input id="account-edit-name" type="text" minlength="2" maxlength="50" required />
+        <label for="account-edit-email">E-mail</label>
+        <input id="account-edit-email" type="email" required />
+        <p id="account-message" class="auth-message" role="status"></p>
+        <button class="save-account-button" type="submit">Salvar alterações</button>
+      </form>
+    </dialog>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="theme.js"></script>
+    <script src="game-storage.js"></script>
+    <script src="menu.js"></script>
+  </body>
+</html>

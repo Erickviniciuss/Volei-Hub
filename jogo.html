@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Jogo Rápido | Vôlei Hub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="app-loading" data-theme="dark">
+    <main class="page-shell quick-game-shell">
+      <div class="table-top-actions">
+        <img class="table-logo" data-theme-logo src="assets/logo_escuro.png" alt="Vôlei Hub" />
+        <button class="theme-button" type="button" data-theme-toggle aria-pressed="true">☀</button>
+      </div>
+      <section class="hero" aria-labelledby="quick-title">
+        <p class="eyebrow">PARTIDA AO VIVO</p>
+        <h1 id="quick-title">Jogo Rápido</h1>
+        <p class="hero-text">Configure a partida, lance os placares e avance automaticamente pelas rodadas.</p>
+      </section>
+
+      <section id="quick-setup" class="setup-card" aria-label="Configuração do jogo rápido">
+        <div class="settings-row">
+          <p class="eyebrow">CONFIGURAÇÃO DO JOGO</p>
+          <button id="quick-settings-toggle" class="settings-button" type="button" aria-label="Abrir configurações" aria-expanded="false">⚙</button>
+        </div>
+        <div id="quick-settings-panel" class="settings-panel" hidden>
+          <label class="switch-label" for="quick-unlimited-rounds">
+            <input id="quick-unlimited-rounds" type="checkbox" />
+            <span><strong>Sem limite de rodadas</strong><small>Permite qualquer quantidade de rodadas e distribui os reencontros pelo calendário.</small></span>
+          </label>
+        </div>
+        <div class="field-row">
+          <div class="field-group">
+            <label for="quick-team-count">Quantidade de times</label>
+            <select id="quick-team-count">
+              <option value="3">3 times</option><option value="4">4 times</option><option value="5" selected>5 times</option><option value="6">6 times</option><option value="7">7 times</option><option value="8">8 times</option>
+            </select>
+          </div>
+          <div class="field-group compact-field">
+            <label for="quick-round-count">Rodadas do jogo</label>
+            <input id="quick-round-count" type="number" min="1" value="5" />
+          </div>
+          <div class="field-group compact-field">
+            <label for="quick-player-count">Pessoas por time</label>
+            <select id="quick-player-count"><option value="3">3 pessoas</option><option value="4" selected>4 pessoas</option><option value="5">5 pessoas</option><option value="6">6 pessoas</option></select>
+          </div>
+          <button id="quick-start" type="button">Iniciar jogo</button>
+        </div>
+        <div id="quick-team-names" class="team-names"></div>
+      </section>
+
+      <section id="quick-game" class="quick-game" hidden aria-live="polite">
+        <div class="quick-game-heading">
+          <div><p class="eyebrow">EM ANDAMENTO</p><h2 id="current-round-title">Rodada 1</h2></div>
+          <div class="game-actions">
+            <button id="show-rounds" class="secondary-button" type="button">Ver todas as rodadas</button>
+            <button id="adjust-game-toggle" class="secondary-button" type="button" aria-expanded="false">Ajustar jogo</button>
+            <button id="finish-game" class="danger-button" type="button">Encerrar jogo</button>
+          </div>
+        </div>
+        <p id="round-progress" class="quick-progress"></p>
+        <div id="current-matches" class="current-matches"></div>
+        <button id="confirm-round" class="confirm-round" type="button" disabled>Confirmar placares e próxima rodada</button>
+        <p id="score-message" class="score-message" role="alert"></p>
+        <section class="live-ranking" aria-live="polite"><h3>Ranking atual</h3><div id="live-ranking-list" class="ranking-list"></div></section>
+        <div id="live-settings" class="live-settings" hidden>
+          <div class="settings-row"><p class="eyebrow">AJUSTAR PRÓXIMAS RODADAS</p></div>
+          <div class="field-row">
+            <div class="field-group"><label for="live-team-count">Quantidade de times</label><select id="live-team-count"><option value="3">3 times</option><option value="4">4 times</option><option value="5">5 times</option><option value="6">6 times</option><option value="7">7 times</option><option value="8">8 times</option></select></div>
+            <div class="field-group compact-field"><label for="live-round-count">Rodadas totais</label><input id="live-round-count" type="number" min="1" /></div>
+            <div class="field-group compact-field"><label for="live-player-count">Pessoas por time</label><select id="live-player-count"><option value="3">3 pessoas</option><option value="4">4 pessoas</option><option value="5">5 pessoas</option><option value="6">6 pessoas</option></select></div>
+          </div>
+          <div id="live-team-names" class="team-names"></div>
+          <button id="apply-live-settings" type="button">Aplicar às próximas rodadas</button>
+        </div>
+      </section>
+
+      <section id="quick-finished" class="quick-finished" hidden>
+        <p class="eyebrow">JOGO ENCERRADO</p><h2 id="finished-title">Partida finalizada</h2><p id="finished-copy"></p>
+        <div id="finished-ranking" class="finished-ranking"></div>
+        <button id="new-game" type="button">Criar novo jogo</button>
+      </section>
+
+      <section id="rounds-overview" class="rounds-overview" hidden>
+        <div class="overview-heading"><h2>Todas as rodadas</h2><button id="close-overview" class="dialog-close" type="button" aria-label="Fechar">×</button></div>
+        <div id="overview-rounds" class="rounds"></div>
+      </section>
+      <a class="home-button" href="index.html"><span aria-hidden="true">⌂</span> Menu principal</a>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="theme.js"></script>
+    <script src="table-auth.js"></script>
+    <script src="game-storage.js"></script>
+    <script src="jogo.js"></script>
+  </body>
+</html>

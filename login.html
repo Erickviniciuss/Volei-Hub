@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Entrar | Vôlei Hub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body data-theme="dark">
+    <main class="auth-screen" aria-labelledby="auth-title">
+      <div class="login-top-actions">
+        <img class="top-logo" data-theme-logo src="assets/logo_escuro.png" alt="Vôlei Hub" />
+        <button class="theme-button" type="button" data-theme-toggle aria-pressed="true">☀</button>
+      </div>
+      <section class="auth-card">
+        <p class="eyebrow">VÔLEI HUB</p>
+        <h1 id="auth-title">Sua conta,<br />seu campeonato.</h1>
+        <p class="auth-intro">Entre para criar e acompanhar as tabelas dos seus jogos.</p>
+        <div class="auth-tabs" role="tablist" aria-label="Acesso à conta">
+          <button id="login-tab" class="auth-tab is-active" type="button" role="tab" aria-selected="true">Entrar</button>
+          <button id="signup-tab" class="auth-tab" type="button" role="tab" aria-selected="false">Criar conta</button>
+        </div>
+        <form id="login-form" class="auth-form">
+          <label for="login-email">E-mail</label>
+          <input id="login-email" type="email" autocomplete="email" placeholder="voce@email.com" required />
+          <label for="login-password">Senha</label>
+          <input id="login-password" type="password" autocomplete="current-password" placeholder="Sua senha" required />
+          <button type="submit">Entrar na conta</button>
+        </form>
+        <form id="signup-form" class="auth-form" hidden>
+          <label for="signup-name">Nome da conta</label>
+          <input id="signup-name" type="text" autocomplete="name" placeholder="Como podemos chamar você?" minlength="2" maxlength="50" required />
+          <label for="signup-email">E-mail</label>
+          <input id="signup-email" type="email" autocomplete="email" placeholder="voce@email.com" required />
+          <label for="signup-password">Senha</label>
+          <input id="signup-password" type="password" autocomplete="new-password" placeholder="Mínimo de 6 caracteres" minlength="6" required />
+          <label for="signup-password-confirm">Confirmar senha</label>
+          <input id="signup-password-confirm" type="password" autocomplete="new-password" placeholder="Repita sua senha" minlength="6" required />
+          <button type="submit">Criar minha conta</button>
+        </form>
+        <p id="auth-message" class="auth-message" role="status" aria-live="polite"></p>
+      </section>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="theme.js"></script>
+    <script src="auth.js"></script>
+  </body>
+</html>
