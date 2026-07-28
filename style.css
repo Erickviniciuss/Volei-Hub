@@ -216,17 +216,19 @@ button:hover { background: var(--purple-dark); transform: translateY(-1px); }
 .team-away { text-align: right; }
 .versus { text-align: center; color: #a7b0c2; font-family: "Barlow Condensed", sans-serif; font-size: 1.1rem; }
 .bye { padding: 13px 16px; color: var(--muted); background: var(--soft-card); font-size: .86rem; }
+.bye:last-child { border-radius: 0 0 15px 15px; box-shadow: inset 0 -1px 0 var(--line); }
 .bye strong { color: var(--ink); }
 
 @media (max-width: 580px) {
   .page-shell { width: min(100% - 24px, 1140px); padding-top: 38px; }
-  .login-top-actions { top: 12px; right: 12px; }
-  .top-logo { width: 142px; }
+  .auth-screen { align-content: start; gap: 16px; padding: 12px; }
+  .login-top-actions { position: static; width: min(100%, 620px); justify-content: space-between; }
+  .top-logo { width: min(142px, 48vw); }
   .theme-button, #theme-toggle { width: 35px; min-height: 35px; font-size: .85rem; }
   .menu-shell { grid-template-columns: 1fr; }
   .sidebar { min-height: auto; padding: 18px; border-bottom: 1px solid var(--line); border-left: 0; }
   .system-nav { margin-top: 18px; }
-  .sidebar-action { display: none; }
+  .sidebar-action { display: block; margin-top: 18px; }
   .menu-content { width: min(100% - 32px, 1050px); padding: 36px 0; }
   .menu-header { flex-direction: column; }
   .menu-welcome { margin-top: 42px; }

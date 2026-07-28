@@ -187,7 +187,9 @@ function renderOverview() {
 
 function finishQuickGame(message) {
   const standings = buildStandings();
-  window.quickGameStore.addResult({ id: Date.now(), finishedAt: new Date().toISOString(), reason: message, standings, schedule: quickSchedule, scores: [...scores.entries()] });
+  const result = { id: Date.now(), finishedAt: new Date().toISOString(), reason: message, standings, schedule: quickSchedule, scores: [...scores.entries()] };
+  window.quickGameStore.addResult(result);
+  window.quickGameStore.saveResultToCloud(result).catch((error) => console.warn("Não foi possível salvar o resultado no Supabase.", error));
   window.quickGameStore.clearActive();
   quickGame.hidden = true; overview.hidden = true; quickFinished.hidden = false;
   document.querySelector("#finished-copy").textContent = message;
