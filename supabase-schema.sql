@@ -36,3 +36,41 @@ create policy "Users can delete their own game results"
   on public.game_results for delete
   to authenticated
   using (auth.uid() = user_id);
+
+-- Partidas em andamento compartilhadas por código de acompanhamento.
+create table if not exists public.live_games (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade default auth.uid(),
+  share_code text not null unique,
+  game_data jsonb not null,
+  is_active boolean not null default true,
+  updated_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+
+alter table public.live_games enable row level security;
+
+drop policy if exists "Owners manage their live games" on public.live_games;
+drop policy if exists "Anyone can view active live games" on public.live_games;
+
+create policy "Owners manage their live games"
+  on public.live_games for all
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create policy "Anyone can view active live games"
+  on public.live_games for select
+  to anon, authenticated
+  using (is_active = true);
+
+-- Necessário para a atualização imediata dos espectadores.
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'live_games'
+  ) then
+    alter publication supabase_realtime add table public.live_games;
+  end if;
+end $$;

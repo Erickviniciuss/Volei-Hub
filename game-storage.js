@@ -42,4 +42,23 @@ window.quickGameStore = {
     if (!cloudSupabase) return { error: new Error("Supabase não configurado") };
     return cloudSupabase.from("game_results").delete().eq("local_id", String(id));
   },
+  async saveLiveGame(game) {
+    if (!cloudSupabase) return { error: new Error("Supabase não configurado") };
+    return cloudSupabase.from("live_games").upsert({
+      share_code: game.shareCode,
+      game_data: game,
+      is_active: true,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "share_code" });
+  },
+  async closeLiveGame(shareCode) {
+    if (!cloudSupabase || !shareCode) return { error: null };
+    return cloudSupabase.from("live_games").update({ is_active: false, updated_at: new Date().toISOString() }).eq("share_code", shareCode);
+  },
+  async getLiveGame(shareCode) {
+    if (!cloudSupabase) return { data: null, error: new Error("Supabase não configurado") };
+    const { data, error } = await cloudSupabase.from("live_games").select("game_data,is_active,updated_at").eq("share_code", shareCode).maybeSingle();
+    return { data: data ? { ...data.game_data, isActive: data.is_active, updatedAt: data.updated_at } : null, error };
+  },
+  getCloudClient() { return cloudSupabase; },
 };

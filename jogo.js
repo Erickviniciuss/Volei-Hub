@@ -19,10 +19,16 @@ let scores = new Map();
 let currentTeams = [];
 let currentPlayerCount = 4;
 let currentPlayers = [];
+let currentShareCode = "";
 
 function escapeQuick(value) { return String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#039;", '"': "&quot;" })[char]); }
 function maxQuickRounds(total) { return total % 2 === 0 ? total - 1 : total; }
 function normalizeQuickRounds(value, max, unlimited) { const requested = Math.max(1, Number(value) || 1); return unlimited ? requested : Math.max(max, Math.round(requested / max) * max); }
+function generateShareCode() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const values = crypto.getRandomValues(new Uint8Array(8));
+  return `VH-${[...values].map((value) => alphabet[value % alphabet.length]).join("")}`;
+}
 
 function makeQuickTeamInputs() {
   const previous = [...document.querySelectorAll(".quick-team-name")].map((input) => input.value);
@@ -85,7 +91,11 @@ function buildQuickSchedule(teams, rounds, initialBye = null) {
 function scoreKey(round, game) { return `${round}-${game}`; }
 function rankingStats(team) { return `<small class="ranking-stats"><span><b>Vit.</b>${team.wins}</span><span><b>Pontos</b>${team.points}</span><span><b>Saldo</b>${team.difference >= 0 ? "+" : ""}${team.difference}</span></small>`; }
 function saveQuickGame() {
-  window.quickGameStore.saveActive({ status: "active", schedule: quickSchedule, currentRound, scores: [...scores.entries()], teams: currentTeams, playerCount: currentPlayerCount, players: currentPlayers });
+  const game = { status: "active", shareCode: currentShareCode, schedule: quickSchedule, currentRound, scores: [...scores.entries()], teams: currentTeams, playerCount: currentPlayerCount, players: currentPlayers };
+  window.quickGameStore.saveActive(game);
+  window.quickGameStore.saveLiveGame(game).then(({ error }) => {
+    if (error) console.warn("Não foi possível atualizar o acompanhamento ao vivo.", error);
+  }).catch((error) => console.warn("Não foi possível atualizar o acompanhamento ao vivo.", error));
 }
 
 function buildStandings() {
@@ -111,6 +121,7 @@ function renderCurrentRound() {
   const round = quickSchedule[currentRound];
   currentRoundTitle.textContent = `Rodada ${currentRound + 1}`;
   roundProgress.textContent = `${currentRound + 1} de ${quickSchedule.length} rodadas`;
+  document.querySelector("#share-code-value").textContent = currentShareCode;
   currentMatches.innerHTML = round.matches.map(([home, away], gameIndex) => {
     const existing = scores.get(scoreKey(currentRound, gameIndex)) || ["", ""];
     return `<article class="score-card">${quickTeamDropdown(home)}<div class="score-inputs"><input data-game="${gameIndex}" data-side="0" type="number" min="0" inputmode="numeric" value="${existing[0]}" aria-label="Pontos de ${escapeQuick(home)}" /><b>×</b><input data-game="${gameIndex}" data-side="1" type="number" min="0" inputmode="numeric" value="${existing[1]}" aria-label="Pontos de ${escapeQuick(away)}" /></div>${quickTeamDropdown(away, true)}</article>`;
@@ -227,6 +238,7 @@ async function finishQuickGame(message) {
   const { error } = await window.quickGameStore.saveResultToCloud(result);
   if (error) console.warn("Não foi possível salvar o resultado no Supabase.", error);
   window.quickGameStore.clearActive();
+  await window.quickGameStore.closeLiveGame(currentShareCode);
   quickGame.hidden = true; overview.hidden = true; quickFinished.hidden = false;
   document.querySelector("#finished-copy").textContent = message;
   document.querySelector("#finished-ranking").innerHTML = `<h3>Classificação final</h3><div class="ranking-list">${standings.map((team, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong><span>${escapeQuick(team.name)}</span>${rankingStats(team)}</div>`).join("")}</div>`;
@@ -246,7 +258,7 @@ document.querySelector("#quick-start").addEventListener("click", () => {
   const teams = [...document.querySelectorAll(".quick-team-name")].map((input, index) => input.value.trim() || `Equipe ${index + 1}`);
   const rounds = normalizeQuickRounds(quickRoundCount.value, maxQuickRounds(teams.length), quickUnlimited.checked);
   if (window.quickGameStore.getActive()?.status === "active") return;
-  quickRoundCount.value = rounds; currentTeams = teams; currentPlayerCount = Number(quickPlayerCount.value); currentPlayers = getQuickPlayers(); quickSchedule = buildQuickSchedule(teams, rounds); currentRound = 0; scores = new Map(); saveQuickGame();
+  quickRoundCount.value = rounds; currentTeams = teams; currentPlayerCount = Number(quickPlayerCount.value); currentPlayers = getQuickPlayers(); currentShareCode = generateShareCode(); quickSchedule = buildQuickSchedule(teams, rounds); currentRound = 0; scores = new Map(); saveQuickGame();
   quickSetup.hidden = true; quickGame.hidden = false; renderCurrentRound();
 });
 currentMatches.addEventListener("input", persistPartialScores);
@@ -264,11 +276,16 @@ document.querySelector("#apply-live-settings").addEventListener("click", applyLi
 document.querySelector("#show-rounds").addEventListener("click", () => { renderOverview(); overview.hidden = false; overview.scrollIntoView({ behavior: "smooth", block: "start" }); });
 document.querySelector("#close-overview").addEventListener("click", () => { overview.hidden = true; });
 document.querySelector("#finish-game").addEventListener("click", () => finishQuickGame(`O jogo foi encerrado na rodada ${Math.min(currentRound + 1, quickSchedule.length)}.`));
+document.querySelector("#copy-share-code").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(currentShareCode); document.querySelector("#copy-share-code").textContent = "Código copiado"; }
+  catch { document.querySelector("#copy-share-code").textContent = currentShareCode; }
+  window.setTimeout(() => { document.querySelector("#copy-share-code").textContent = "Copiar código"; }, 1800);
+});
 document.querySelector("#new-game").addEventListener("click", () => { quickFinished.hidden = true; quickSetup.hidden = false; });
 makeQuickTeamInputs();
 
 const savedQuickGame = window.quickGameStore.getActive();
 if (savedQuickGame?.status === "active") {
-  quickSchedule = savedQuickGame.schedule; currentRound = savedQuickGame.currentRound; scores = new Map(savedQuickGame.scores || []); currentTeams = savedQuickGame.teams || []; currentPlayerCount = savedQuickGame.playerCount || 4; currentPlayers = savedQuickGame.players || currentTeams.map(() => []);
+  quickSchedule = savedQuickGame.schedule; currentRound = savedQuickGame.currentRound; scores = new Map(savedQuickGame.scores || []); currentTeams = savedQuickGame.teams || []; currentPlayerCount = savedQuickGame.playerCount || 4; currentPlayers = savedQuickGame.players || currentTeams.map(() => []); currentShareCode = savedQuickGame.shareCode || generateShareCode(); saveQuickGame();
   quickSetup.hidden = true; quickGame.hidden = false; renderCurrentRound();
 }

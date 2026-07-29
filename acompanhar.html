@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Acompanhar jogo | Vôlei Hub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="icon" type="image/png" href="assets/favicon.png" />
+  </head>
+  <body class="app-loading" data-theme="dark">
+    <main class="page-shell viewer-shell">
+      <div class="table-top-actions"><img class="table-logo" data-theme-logo src="assets/logo_escuro.png" alt="Vôlei Hub" /><button class="theme-button" type="button" data-theme-toggle aria-pressed="true">☀</button></div>
+      <section class="hero"><p class="eyebrow">ACOMPANHAMENTO AO VIVO</p><h1>Jogo em andamento</h1><p class="hero-text">Veja as rodadas e o ranking atual. Esta página é somente para visualização.</p></section>
+      <p id="viewer-code" class="viewer-code"></p>
+      <p id="viewer-status" class="result-sync-status" aria-live="polite">Carregando jogo…</p>
+      <section id="viewer-content" hidden>
+        <section class="live-ranking"><h3>Ranking atual</h3><div id="viewer-ranking" class="ranking-list"></div></section>
+        <section class="schedule-section"><div class="schedule-heading"><div><p class="eyebrow">RODADAS</p><h2>Calendário do jogo</h2></div></div><div id="viewer-rounds" class="rounds"></div></section>
+      </section>
+      <a class="home-button" href="login.html"><span aria-hidden="true">⌂</span> Voltar</a>
+    </main>
+    <footer class="site-footer">© 2026 RST Code. Todos os direitos reservados.</footer>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="theme.js"></script>
+    <script src="game-storage.js"></script>
+    <script src="acompanhar.js"></script>
+  </body>
+</html>

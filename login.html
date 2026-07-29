@@ -30,6 +30,12 @@
           <label for="login-password">Senha</label>
           <input id="login-password" type="password" autocomplete="current-password" placeholder="Sua senha" required />
           <button type="submit">Entrar na conta</button>
+          <button id="spectator-toggle" class="secondary-button" type="button">Acompanhar jogo com código</button>
+          <div id="spectator-access" class="spectator-access" hidden>
+            <label for="spectator-code">Código do jogo</label>
+            <input id="spectator-code" type="text" maxlength="12" placeholder="Ex.: VH-8K2M4P" autocomplete="off" />
+            <button id="spectator-enter" type="button">Acompanhar jogo</button>
+          </div>
         </form>
         <form id="signup-form" class="auth-form" hidden>
           <label for="signup-name">Nome da conta</label>
