@@ -3,6 +3,9 @@ const viewerContent = document.querySelector("#viewer-content");
 const viewerCode = document.querySelector("#viewer-code");
 const liveCode = new URLSearchParams(window.location.search).get("codigo")?.trim().toUpperCase();
 
+// Esta página é pública e não passa pelo table-auth, que normalmente remove esta classe.
+document.body.classList.remove("app-loading");
+
 function escapeViewer(value) { return String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#039;", '"': "&quot;" })[char]); }
 function scoreKeyViewer(round, game) { return `${round}-${game}`; }
 function viewerStats(team) { return `<small class="ranking-stats"><span><b>Vit.</b>${team.wins}</span><span><b>Pontos</b>${team.points}</span><span><b>Saldo</b>${team.difference >= 0 ? "+" : ""}${team.difference}</span></small>`; }
