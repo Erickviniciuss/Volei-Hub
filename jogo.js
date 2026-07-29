@@ -94,7 +94,11 @@ function saveQuickGame() {
   const game = { status: "active", shareCode: currentShareCode, schedule: quickSchedule, currentRound, scores: [...scores.entries()], teams: currentTeams, playerCount: currentPlayerCount, players: currentPlayers };
   window.quickGameStore.saveActive(game);
   window.quickGameStore.saveLiveGame(game).then(({ error }) => {
-    if (error) console.warn("Não foi possível atualizar o acompanhamento ao vivo.", error);
+    const status = document.querySelector("#share-code-status");
+    if (error) {
+      console.warn("Não foi possível atualizar o acompanhamento ao vivo.", error);
+      if (status) status.textContent = "Não foi possível publicar o acompanhamento.";
+    } else if (status) status.textContent = "Acompanhamento ativo.";
   }).catch((error) => console.warn("Não foi possível atualizar o acompanhamento ao vivo.", error));
 }
 

@@ -116,6 +116,7 @@ body {
 .share-game-code span { color: var(--muted); font-size: .68rem; font-weight: 700; letter-spacing: .08em; }
 .share-game-code strong { color: var(--purple-dark); font-size: .95rem; letter-spacing: .08em; }
 .share-game-code .secondary-button { margin-left: auto; }
+.share-game-code small { width: 100%; color: var(--muted); font-size: .72rem; }
 .current-matches { display: grid; gap: 12px; }
 .score-card { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 18px; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); font-weight: 700; }
 .score-card > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -240,6 +241,9 @@ button:hover { background: var(--purple-dark); transform: translateY(-1px); }
 @media (max-width: 580px) {
   .page-shell { width: min(100% - 24px, 1140px); padding-top: 38px; }
   .auth-screen { align-content: start; gap: 16px; padding: 12px; }
+  .auth-card { padding: 22px 20px; }
+  .auth-card h1 { font-size: clamp(2.5rem, 13vw, 3.15rem); }
+  .auth-intro { margin: 12px 0 18px; }
   .login-top-actions { position: static; width: min(100%, 620px); justify-content: space-between; }
   .top-logo { width: min(142px, 48vw); }
   .theme-button, #theme-toggle { width: 35px; min-height: 35px; font-size: .85rem; }

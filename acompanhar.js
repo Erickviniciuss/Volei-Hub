@@ -38,7 +38,7 @@ function renderViewer(game) {
 async function loadViewerGame() {
   if (!liveCode) { viewerStatus.textContent = "Código de jogo não informado."; viewerStatus.classList.add("is-error"); return; }
   const { data, error } = await window.quickGameStore.getLiveGame(liveCode);
-  if (error || !data) { viewerStatus.textContent = "Jogo não encontrado ou já finalizado."; viewerStatus.classList.add("is-error"); viewerContent.hidden = true; return; }
+  if (error || !data) { viewerStatus.textContent = error ? `Não foi possível carregar o jogo: ${error.message}` : "Jogo não encontrado ou já finalizado."; viewerStatus.classList.add("is-error"); viewerContent.hidden = true; return; }
   viewerStatus.classList.remove("is-error");
   renderViewer(data);
 }

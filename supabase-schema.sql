@@ -64,6 +64,10 @@ create policy "Anyone can view active live games"
   to anon, authenticated
   using (is_active = true);
 
+grant select on public.live_games to anon, authenticated;
+grant insert, update, delete on public.live_games to authenticated;
+alter table public.live_games replica identity full;
+
 -- Necessário para a atualização imediata dos espectadores.
 do $$
 begin
