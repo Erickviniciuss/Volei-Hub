@@ -15,6 +15,13 @@ function setMessage(message, type = "") {
   authMessage.className = `auth-message ${type}`;
 }
 
+function authErrorMessage(error) {
+  if (error?.message?.toLowerCase().includes("email rate limit")) {
+    return "Limite de e-mails do Supabase atingido. Aguarde antes de tentar novamente ou configure um SMTP próprio no projeto.";
+  }
+  return error?.message || "Não foi possível concluir a operação.";
+}
+
 function showForm(form) {
   const isLogin = form === "login";
   loginForm.hidden = !isLogin;
@@ -50,7 +57,7 @@ loginForm.addEventListener("submit", async (event) => {
     password: document.querySelector("#login-password").value,
   });
   button.disabled = false;
-  if (error) setMessage(error.message, "is-error");
+  if (error) setMessage(authErrorMessage(error), "is-error");
   else openTable();
 });
 
@@ -73,7 +80,7 @@ signupForm.addEventListener("submit", async (event) => {
   });
   button.disabled = false;
   if (error) {
-    setMessage(error.message, "is-error");
+    setMessage(authErrorMessage(error), "is-error");
     return;
   }
   if (data.session) openTable();

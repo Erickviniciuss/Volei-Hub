@@ -10,6 +10,7 @@ const playersToggle = document.querySelector("#players-toggle");
 const generateButton = document.querySelector("#generate-button");
 const roundsContainer = document.querySelector("#rounds");
 const summary = document.querySelector("#schedule-summary");
+let generatedSchedule = [];
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>'"]/g, (character) => ({
@@ -155,6 +156,7 @@ function renderSchedule() {
   const totalRounds = normalizeRoundCount(roundCount.value, maximumRounds, unlimitedRounds.checked);
   roundCount.value = totalRounds;
   const schedule = buildGameSchedule(teams, totalRounds);
+  generatedSchedule = schedule;
   const matches = schedule.reduce((total, round) => total + round.matches.length, 0);
   const possibleMatches = (teams.length * (teams.length - 1)) / 2;
   const uniqueMatches = new Set(schedule.flatMap((round) => round.matches.map(([home, away]) => [home, away].sort().join("|")))).size;
@@ -169,6 +171,17 @@ function renderSchedule() {
       ${bye ? `<div class="bye">Folga: <strong>${escapeHtml(bye)}</strong></div>` : ""}
     </article>
   `).join("");
+}
+
+function printGeneratedTable() {
+  if (!generatedSchedule.length) return;
+  const rounds = generatedSchedule.map((round, index) => `<section class="round"><h2>Rodada ${index + 1}</h2>${round.matches.map(([home, away]) => `<div class="match"><span>${escapeHtml(home)}</span><strong>×</strong><span>${escapeHtml(away)}</span></div>`).join("")}${round.bye ? `<p>Folga: <b>${escapeHtml(round.bye)}</b></p>` : ""}</section>`).join("");
+  const report = window.open("", "_blank");
+  if (!report) return;
+  report.document.open();
+  report.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Tabela - Vôlei Hub</title><style>body{font-family:Arial,sans-serif;color:#1e293b;margin:36px}h1{font-size:32px}.round{break-inside:avoid;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin:16px 0}.round h2{margin:0 0 12px}.match{display:grid;grid-template-columns:1fr auto 1fr;gap:18px;padding:9px 0;border-bottom:1px solid #e2e8f0}.match span:last-child{text-align:right}.match strong{color:#0e7490}@media print{body{margin:18px}}</style></head><body><p>VÔLEI HUB · CALENDÁRIO</p><h1>Tabela de jogos</h1>${rounds}</body></html>`);
+  report.document.close();
+  window.setTimeout(() => { report.focus(); report.print(); }, 300);
 }
 
 countSelect.addEventListener("change", makeNameInputs);
@@ -204,6 +217,7 @@ playersToggle.addEventListener("click", () => {
   playersToggle.textContent = willOpen ? "Ocultar participantes" : "Cadastrar participantes";
 });
 generateButton.addEventListener("click", renderSchedule);
+document.querySelector("#print-table").addEventListener("click", printGeneratedTable);
 roundsContainer.addEventListener("click", (event) => {
   const selected = event.target.closest(".team-dropdown details");
   if (!selected) return;

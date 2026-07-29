@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="style.css" />
+    <link rel="icon" type="image/png" href="assets/favicon.png" />
   </head>
   <body class="app-loading" data-theme="dark">
     <main class="page-shell">
@@ -70,6 +71,11 @@
         <div id="players-panel" class="players-panel" hidden aria-label="Nomes dos participantes"></div>
       </section>
 
+      <div class="table-utility-actions">
+        <a class="home-button" href="index.html"><span aria-hidden="true">⌂</span> Menu principal</a>
+        <button id="print-table" class="secondary-button" type="button">Gerar PDF da tabela</button>
+      </div>
+
       <section id="schedule-section" class="schedule-section" aria-live="polite">
         <div class="schedule-heading">
           <div>
@@ -79,9 +85,9 @@
           <div id="schedule-summary" class="summary"></div>
         </div>
         <div id="rounds" class="rounds"></div>
-        <a class="home-button" href="index.html" aria-label="Retornar ao menu principal"><span aria-hidden="true">⌂</span> Menu principal</a>
       </section>
     </main>
+    <footer class="site-footer">© 2026 RST Code. Todos os direitos reservados.</footer>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-config.js"></script>
     <script src="theme.js"></script>

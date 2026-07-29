@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="style.css" />
+    <link rel="icon" type="image/png" href="assets/favicon.png" />
   </head>
   <body class="app-loading" data-theme="dark">
     <main class="page-shell quick-game-shell">
@@ -50,6 +51,8 @@
           <button id="quick-start" type="button">Iniciar jogo</button>
         </div>
         <div id="quick-team-names" class="team-names"></div>
+        <div class="names-toggle-row"><p>Cadastre os integrantes de cada equipe.</p><button id="quick-players-toggle" class="secondary-button" type="button" aria-expanded="false">Cadastrar participantes</button></div>
+        <div id="quick-players-panel" class="players-panel" hidden></div>
       </section>
 
       <section id="quick-game" class="quick-game" hidden aria-live="polite">
@@ -74,6 +77,7 @@
             <div class="field-group compact-field"><label for="live-player-count">Pessoas por time</label><select id="live-player-count"><option value="3">3 pessoas</option><option value="4">4 pessoas</option><option value="5">5 pessoas</option><option value="6">6 pessoas</option></select></div>
           </div>
           <div id="live-team-names" class="team-names"></div>
+          <div id="live-players-panel" class="players-panel" aria-label="Editar nomes dos participantes"></div>
           <button id="apply-live-settings" type="button">Aplicar às próximas rodadas</button>
         </div>
       </section>
@@ -90,6 +94,7 @@
       </section>
       <a class="home-button" href="index.html"><span aria-hidden="true">⌂</span> Menu principal</a>
     </main>
+    <footer class="site-footer">© 2026 RST Code. Todos os direitos reservados.</footer>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-config.js"></script>
     <script src="theme.js"></script>
