@@ -42,7 +42,7 @@
           </div>
           <div class="field-group compact-field">
             <label for="quick-round-count">Rodadas do jogo</label>
-            <input id="quick-round-count" type="number" min="1" value="5" />
+            <input id="quick-round-count" type="number" min="1" value="20" />
           </div>
           <div class="field-group compact-field">
             <label for="quick-player-count">Pessoas por time</label>
@@ -60,6 +60,7 @@
           <div><p class="eyebrow">EM ANDAMENTO</p><h2 id="current-round-title">Rodada 1</h2></div>
           <div class="game-actions">
             <button id="show-rounds" class="secondary-button" type="button">Ver todas as rodadas</button>
+            <button id="print-game" class="secondary-button" type="button">Imprimir PDF</button>
             <button id="adjust-game-toggle" class="secondary-button" type="button" aria-expanded="false">Ajustar jogo</button>
             <button id="finish-game" class="danger-button" type="button">Encerrar jogo</button>
           </div>
@@ -78,7 +79,8 @@
             <div class="field-group compact-field"><label for="live-player-count">Pessoas por time</label><select id="live-player-count"><option value="3">3 pessoas</option><option value="4">4 pessoas</option><option value="5">5 pessoas</option><option value="6">6 pessoas</option></select></div>
           </div>
           <div id="live-team-names" class="team-names"></div>
-          <div id="live-players-panel" class="players-panel" aria-label="Editar nomes dos participantes"></div>
+          <div class="names-toggle-row"><p>Edite os participantes das equipes.</p><button id="live-players-toggle" class="secondary-button" type="button" aria-expanded="false">Editar participantes</button></div>
+          <div id="live-players-panel" class="players-panel" hidden aria-label="Editar nomes dos participantes"></div>
           <button id="apply-live-settings" type="button">Aplicar às próximas rodadas</button>
         </div>
       </section>
@@ -90,7 +92,9 @@
       </section>
 
       <section id="rounds-overview" class="rounds-overview" hidden>
-        <div class="overview-heading"><h2>Todas as rodadas</h2><button id="close-overview" class="dialog-close" type="button" aria-label="Fechar">×</button></div>
+        <div class="overview-heading"><h2>Todas as rodadas</h2><div class="overview-actions"><button id="retro-edit-toggle" class="secondary-button" type="button">Ajustar jogos</button><button id="close-overview" class="dialog-close" type="button" aria-label="Fechar">×</button></div></div>
+        <div id="retro-auth-panel" class="retro-auth-panel" hidden><label for="retro-password">Senha da conta</label><div><input id="retro-password" type="password" autocomplete="current-password" placeholder="Informe sua senha" /><button id="unlock-retro-edit" type="button">Liberar ajustes</button></div><p id="retro-edit-message" class="score-message" role="alert"></p></div>
+        <button id="save-retro-scores" class="confirm-round" type="button" hidden>Salvar ajustes retroativos</button>
         <div id="overview-rounds" class="rounds"></div>
       </section>
       <a class="home-button" href="index.html"><span aria-hidden="true">⌂</span> Menu principal</a>
@@ -101,6 +105,7 @@
     <script src="theme.js"></script>
     <script src="table-auth.js"></script>
     <script src="game-storage.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="jogo.js"></script>
   </body>
 </html>

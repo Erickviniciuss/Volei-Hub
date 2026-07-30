@@ -55,8 +55,8 @@ function makePlayerInputs() {
           <div class="player-inputs">
             ${Array.from({ length: totalPlayers }, (_, playerIndex) => {
               const id = `player-${teamIndex + 1}-${playerIndex + 1}`;
-              const value = savedPlayers.get(id) || `Pessoa ${playerIndex + 1}`;
-              return `<input class="player-name" id="${id}" data-team="${teamIndex}" type="text" value="${escapeHtml(value)}" maxlength="28" aria-label="Pessoa ${playerIndex + 1} de ${escapeHtml(team)}" />`;
+              const value = savedPlayers.get(id) || "";
+              return `<input class="player-name" id="${id}" data-team="${teamIndex}" type="text" value="${escapeHtml(value)}" placeholder="Nome do participante" maxlength="28" aria-label="Pessoa ${playerIndex + 1} de ${escapeHtml(team)}" />`;
             }).join("")}
           </div>
         </section>
@@ -127,9 +127,8 @@ function buildGameSchedule(teams, totalRounds) {
   return Array.from({ length: totalRounds }, (_, index) => {
     const cycle = Math.floor(index / uniqueMatchdays.length);
     const matchday = uniqueMatchdays[index % uniqueMatchdays.length];
-    const baseMatches = cycle % 2 !== 0
-      ? matchday.matches.map(([home, away]) => [away, home])
-      : matchday.matches;
+    // Ao ultrapassar um ciclo completo, repete as rodadas iniciais.
+    const baseMatches = matchday.matches.map(([home, away]) => [home, away]);
     const matches = putOpeningMatchFirst(baseMatches, previousBye);
     previousBye = matchday.bye;
     return {
@@ -142,12 +141,14 @@ function buildGameSchedule(teams, totalRounds) {
 
 function playersForTeam(teamIndex) {
   return [...document.querySelectorAll(`.player-name[data-team="${teamIndex}"]`)]
-    .map((input, index) => input.value.trim() || `Pessoa ${index + 1}`);
+    .map((input) => input.value.trim())
+    .filter(Boolean);
 }
 
 function teamDropdown(team, teamIndex, away = false) {
   const players = playersForTeam(teamIndex);
-  return `<div class="${away ? "team-away " : ""}team-dropdown"><details><summary>${escapeHtml(team)}</summary><div class="dropdown-menu"><strong>${escapeHtml(team)}</strong><ul>${players.map((player) => `<li>${escapeHtml(player)}</li>`).join("")}</ul></div></details></div>`;
+  const content = players.length ? `<ul>${players.map((player) => `<li>${escapeHtml(player)}</li>`).join("")}</ul>` : "<span>Nenhum participante cadastrado.</span>";
+  return `<div class="${away ? "team-away " : ""}team-dropdown"><details><summary>${escapeHtml(team)}</summary><div class="dropdown-menu"><strong>${escapeHtml(team)}</strong>${content}</div></details></div>`;
 }
 
 function renderSchedule() {
@@ -173,15 +174,36 @@ function renderSchedule() {
   `).join("");
 }
 
-function printGeneratedTable() {
-  if (!generatedSchedule.length) return;
-  const rounds = generatedSchedule.map((round, index) => `<section class="round"><h2>Rodada ${index + 1}</h2>${round.matches.map(([home, away]) => `<div class="match"><span>${escapeHtml(home)}</span><strong>×</strong><span>${escapeHtml(away)}</span></div>`).join("")}${round.bye ? `<p>Folga: <b>${escapeHtml(round.bye)}</b></p>` : ""}</section>`).join("");
-  const report = window.open("", "_blank");
-  if (!report) return;
-  report.document.open();
-  report.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Tabela - Vôlei Hub</title><style>body{font-family:Arial,sans-serif;color:#1e293b;margin:36px}h1{font-size:32px}.round{break-inside:avoid;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin:16px 0}.round h2{margin:0 0 12px}.match{display:grid;grid-template-columns:1fr auto 1fr;gap:18px;padding:9px 0;border-bottom:1px solid #e2e8f0}.match span:last-child{text-align:right}.match strong{color:#0e7490}@media print{body{margin:18px}}</style></head><body><p>VÔLEI HUB · CALENDÁRIO</p><h1>Tabela de jogos</h1>${rounds}</body></html>`);
-  report.document.close();
-  window.setTimeout(() => { report.focus(); report.print(); }, 300);
+async function printGeneratedTable() {
+  if (!generatedSchedule.length) { window.alert("Gere a tabela antes de enviar o PDF."); return; }
+  const Pdf = window.jspdf?.jsPDF;
+  if (!Pdf) { window.alert("Não foi possível preparar o PDF. Verifique sua conexão e tente novamente."); return; }
+  const pdf = new Pdf({ unit: "mm", format: "a4" });
+  let y = 18;
+  const addLine = (text, size = 10, bold = false) => {
+    pdf.setFont("helvetica", bold ? "bold" : "normal"); pdf.setFontSize(size);
+    const lines = pdf.splitTextToSize(text, 175);
+    if (y + lines.length * 6 > 280) { pdf.addPage(); y = 18; }
+    pdf.text(lines, 18, y); y += lines.length * 6;
+  };
+  addLine("VÔLEI HUB", 12, true);
+  addLine("Tabela de jogos", 22, true); y += 3;
+  generatedSchedule.forEach((round, index) => {
+    addLine(`Rodada ${index + 1}`, 14, true);
+    round.matches.forEach(([home, away]) => addLine(`${home}    ×    ${away}`));
+    if (round.bye) addLine(`Folga: ${round.bye}`, 9);
+    y += 4;
+  });
+  const file = new File([pdf.output("blob")], "tabela-volei-hub.pdf", { type: "application/pdf" });
+  const shareData = { title: "Tabela de jogos - Vôlei Hub", text: "Tabela de jogos do Vôlei Hub.", files: [file] };
+  if (navigator.canShare?.({ files: [file] })) {
+    try { await navigator.share(shareData); } catch (error) { if (error.name !== "AbortError") window.alert("Não foi possível abrir o compartilhamento."); }
+    return;
+  }
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(file); link.download = file.name; link.click();
+  URL.revokeObjectURL(link.href);
+  window.open("https://wa.me/?text=" + encodeURIComponent("Tabela de jogos do Vôlei Hub. O PDF foi baixado para você anexar nesta conversa."), "_blank", "noopener");
 }
 
 countSelect.addEventListener("change", makeNameInputs);

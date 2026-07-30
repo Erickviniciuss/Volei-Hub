@@ -7,7 +7,21 @@ function scoreFor(result, roundIndex, gameIndex) {
   const score = new Map(result.scores || []).get(`${roundIndex}-${gameIndex}`);
   return score && score[0] !== "" && score[1] !== "" ? `${score[0]} × ${score[1]}` : "—";
 }
-function resultStats(team) { return `<small class="ranking-stats"><span><b>Vit.</b>${team.wins}</span><span><b>Pontos</b>${team.points}</span><span><b>Saldo</b>${team.difference >= 0 ? "+" : ""}${team.difference}</span></small>`; }
+function resultVisualStats(result, team) {
+  if (Number.isFinite(team.games) && Number.isFinite(team.losses)) return { games: team.games, losses: team.losses };
+  let games = 0; let losses = 0;
+  const scores = new Map(result.scores || []);
+  (result.schedule || []).forEach((round, roundIndex) => round.matches.forEach(([home, away], gameIndex) => {
+    if (home !== team.name && away !== team.name) return;
+    const score = scores.get(`${roundIndex}-${gameIndex}`);
+    if (!score || score[0] === "" || score[1] === "") return;
+    games += 1;
+    const homePoints = Number(score[0]); const awayPoints = Number(score[1]);
+    if ((home === team.name && homePoints < awayPoints) || (away === team.name && awayPoints < homePoints)) losses += 1;
+  }));
+  return { games, losses };
+}
+function resultStats(team, result) { const visual = resultVisualStats(result, team); return `<small class="ranking-stats"><span><b>Jogos</b>${visual.games}</span><span><b>Vit.</b>${team.wins}</span><span><b>Der.</b>${visual.losses}</span><span><b>Pontos</b>${team.points}</span><span><b>Saldo</b>${team.difference >= 0 ? "+" : ""}${team.difference}</span></small>`; }
 
 function renderResults(results) {
   displayedResults = results;
@@ -17,7 +31,7 @@ function renderResults(results) {
   }
   resultsList.innerHTML = results.map((result) => {
     const date = new Date(result.finishedAt).toLocaleString("pt-BR");
-    return `<article class="result-card"><div class="result-card-heading"><div><p class="eyebrow">${date}</p><h2>${escapeResult(result.reason)}</h2></div><div class="result-actions"><button class="print-result" type="button" data-id="${result.id}">Imprimir PDF</button><button class="delete-result" type="button" data-id="${result.id}">Excluir</button></div></div><div class="result-ranking">${result.standings.map((team, index) => `<div><strong>${index + 1}º</strong><span>${escapeResult(team.name)}</span>${resultStats(team)}</div>`).join("")}</div></article>`;
+    return `<article class="result-card"><div class="result-card-heading"><div><p class="eyebrow">${date}</p><h2>${escapeResult(result.reason)}</h2></div><div class="result-actions"><button class="print-result" type="button" data-id="${result.id}">Imprimir PDF</button><button class="delete-result" type="button" data-id="${result.id}">Excluir</button></div></div><div class="result-ranking">${result.standings.map((team, index) => `<div><strong>${index + 1}º</strong><span>${escapeResult(team.name)}</span>${resultStats(team, result)}</div>`).join("")}</div></article>`;
   }).join("");
 }
 

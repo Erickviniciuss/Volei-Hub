@@ -8,12 +8,12 @@ document.body.classList.remove("app-loading");
 
 function escapeViewer(value) { return String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#039;", '"': "&quot;" })[char]); }
 function scoreKeyViewer(round, game) { return `${round}-${game}`; }
-function viewerStats(team) { return `<small class="ranking-stats"><span><b>Vit.</b>${team.wins}</span><span><b>Pontos</b>${team.points}</span><span><b>Saldo</b>${team.difference >= 0 ? "+" : ""}${team.difference}</span></small>`; }
+function viewerStats(team) { return `<small class="ranking-stats"><span><b>Jogos</b>${team.games}</span><span><b>Vit.</b>${team.wins}</span><span><b>Der.</b>${team.losses}</span><span><b>Pontos</b>${team.points}</span><span><b>Saldo</b>${team.difference >= 0 ? "+" : ""}${team.difference}</span></small>`; }
 
 function standingsFor(game) {
   const names = new Set(game.teams || []);
   (game.schedule || []).forEach((round) => round.matches.forEach(([home, away]) => { names.add(home); names.add(away); }));
-  const standings = [...names].map((name) => ({ name, wins: 0, points: 0, conceded: 0, difference: 0 }));
+  const standings = [...names].map((name) => ({ name, games: 0, wins: 0, losses: 0, points: 0, conceded: 0, difference: 0 }));
   const byName = new Map(standings.map((team) => [team.name, team]));
   const scores = new Map(game.scores || []);
   (game.schedule || []).forEach((round, roundIndex) => round.matches.forEach(([home, away], gameIndex) => {
@@ -21,10 +21,11 @@ function standingsFor(game) {
     if (!score || score[0] === "" || score[1] === "") return;
     const homePoints = Number(score[0]); const awayPoints = Number(score[1]);
     const homeTeam = byName.get(home); const awayTeam = byName.get(away);
+    homeTeam.games += 1; awayTeam.games += 1;
     homeTeam.points += homePoints; homeTeam.conceded += awayPoints;
     awayTeam.points += awayPoints; awayTeam.conceded += homePoints;
-    if (homePoints > awayPoints) homeTeam.wins += 1;
-    if (awayPoints > homePoints) awayTeam.wins += 1;
+    if (homePoints > awayPoints) { homeTeam.wins += 1; awayTeam.losses += 1; }
+    if (awayPoints > homePoints) { awayTeam.wins += 1; homeTeam.losses += 1; }
   }));
   return standings.map((team) => ({ ...team, difference: team.points - team.conceded })).sort((a, b) => b.wins - a.wins || b.difference - a.difference || b.points - a.points || a.name.localeCompare(b.name));
 }

@@ -118,7 +118,9 @@ body {
 .share-game-code .secondary-button { margin-left: auto; }
 .share-game-code small { width: 100%; color: var(--muted); font-size: .72rem; }
 .current-matches { display: grid; gap: 12px; }
-.score-card { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 18px; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); font-weight: 700; }
+.score-card { position: relative; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 18px; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); font-weight: 700; }
+.score-card.is-current-game { border: 2px solid #ef4444; box-shadow: 0 0 0 3px rgba(239, 68, 68, .14); }
+.current-game-indicator { position: absolute; top: -10px; left: 14px; padding: 2px 7px; border-radius: 5px; color: #fff; background: #ef4444; font-size: .62rem; letter-spacing: .06em; text-transform: uppercase; }
 .score-card > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .score-card > span:last-child { text-align: right; }
 .score-card .team-dropdown { min-width: 0; }
@@ -128,6 +130,7 @@ body {
 .score-inputs b { color: var(--muted); }
 .quick-bye { margin: 0; padding: 15px 18px; border-radius: 12px; color: var(--muted); background: var(--soft-card); }
 .confirm-round { display: block; width: min(100%, 440px); margin: 22px auto 0; color: #fff; background: #16a34a; box-shadow: 0 8px 18px rgba(22, 163, 74, .24); }
+.confirm-round[hidden] { display: none; }
 .confirm-round:hover:not(:disabled) { background: #15803d; }
 .confirm-round:disabled { color: #d1d5db; background: #6b7280; box-shadow: none; cursor: not-allowed; }
 .score-message { min-height: 1.3em; margin: 10px 0 0; color: #ef4444; font-size: .88rem; font-weight: 600; text-align: center; }
@@ -163,6 +166,12 @@ body {
 .quick-finished p:not(.eyebrow) { color: var(--muted); }
 .rounds-overview { padding: 24px; border: 1px solid var(--line); border-radius: 20px; background: var(--soft-card); }
 .overview-heading { margin-bottom: 20px; }
+.overview-actions { display: flex; align-items: center; gap: 9px; }
+.retro-auth-panel { margin: 0 0 18px; padding: 15px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.retro-auth-panel > div { display: flex; gap: 9px; margin-top: 8px; }
+.retro-auth-panel .score-message { margin-bottom: 0; text-align: left; }
+.retro-score-inputs { display: flex; align-items: center; justify-content: center; gap: 5px; }
+.retro-score-inputs input { width: 44px; padding: 7px 3px; text-align: center; }
 .overview-round.is-current { border: 2px solid #ef4444; box-shadow: 0 0 0 3px rgba(239, 68, 68, .16); }
 .overview-round.is-current .round-title { background: #ef4444; }
 .overview-match { grid-template-columns: 1fr auto 1fr; }
@@ -256,6 +265,9 @@ button:hover { background: var(--purple-dark); transform: translateY(-1px); }
   .menu-welcome { margin-top: 42px; }
   .field-row, .schedule-heading, .names-toggle-row { align-items: stretch; flex-direction: column; }
   .quick-game-heading, .overview-heading { flex-direction: column; }
+  .overview-actions { width: 100%; }
+  .overview-actions .secondary-button { flex: 1; }
+  .retro-auth-panel > div { flex-direction: column; }
   .result-card-heading { flex-direction: column; }
   .result-actions { width: 100%; }
   .result-actions button { flex: 1; padding: 0 6px; }
