@@ -111,6 +111,12 @@ body {
 .game-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
 .danger-button { color: #fff; background: #dc2626; box-shadow: none; }
 .danger-button:hover { background: #b91c1c; }
+.finish-confirm-panel { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 18px; padding: 15px 17px; border: 1px solid #ef4444; border-radius: 13px; background: var(--card); }
+.finish-confirm-panel[hidden] { display: none; }
+.finish-confirm-panel strong, .finish-confirm-panel p { display: block; }
+.finish-confirm-panel p { margin: 4px 0 0; color: var(--muted); font-size: .84rem; }
+.finish-confirm-panel > div { display: flex; gap: 8px; flex-shrink: 0; }
+.finish-confirm-panel button { min-height: 38px; }
 .quick-progress { margin: 12px 0 20px; color: var(--muted); font-weight: 600; }
 .share-game-code { display: flex; align-items: center; gap: 10px; margin: -8px 0 20px; padding: 11px 13px; border: 1px dashed var(--line); border-radius: 11px; background: var(--soft-card); }
 .share-game-code span { color: var(--muted); font-size: .68rem; font-weight: 700; letter-spacing: .08em; }
@@ -288,7 +294,11 @@ button:hover { background: var(--purple-dark); transform: translateY(-1px); }
   .game-actions #print-game { grid-column: 2; }
   .game-actions #adjust-game-toggle { grid-column: 3; }
   .game-actions #finish-game { grid-column: 1 / -1; }
+  .game-actions .secondary-button { min-height: 42px; padding: 5px 3px; font-size: .67rem; line-height: 1.1; white-space: normal; }
   .quick-game-heading .game-actions { width: 100%; max-width: 500px; align-self: center; justify-content: center; }
+  .finish-confirm-panel { align-items: stretch; flex-direction: column; }
+  .finish-confirm-panel > div { width: 100%; }
+  .finish-confirm-panel > div button { flex: 1; }
   .score-card { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 7px; padding: 12px 8px; }
   .share-game-code { flex-wrap: wrap; justify-content: center; text-align: center; }
   .share-game-code .secondary-button { width: auto; margin-left: 0; }

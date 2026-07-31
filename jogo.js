@@ -378,7 +378,9 @@ document.querySelector("#close-overview").addEventListener("click", () => {
   document.querySelector("#retro-password").value = "";
   document.querySelector("#retro-edit-message").textContent = "";
 });
-document.querySelector("#finish-game").addEventListener("click", () => finishQuickGame(`O jogo foi encerrado na rodada ${Math.min(currentRound + 1, quickSchedule.length)}.`));
+document.querySelector("#finish-game").addEventListener("click", () => { document.querySelector("#finish-confirm-panel").hidden = false; });
+document.querySelector("#cancel-finish-game").addEventListener("click", () => { document.querySelector("#finish-confirm-panel").hidden = true; });
+document.querySelector("#confirm-finish-game").addEventListener("click", () => finishQuickGame(`O jogo foi encerrado na rodada ${Math.min(currentRound + 1, quickSchedule.length)}.`));
 document.querySelector("#copy-share-code").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText(currentShareCode); document.querySelector("#copy-share-code").textContent = "Código copiado"; }
   catch { document.querySelector("#copy-share-code").textContent = currentShareCode; }
