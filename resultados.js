@@ -70,8 +70,34 @@ async function printResult(result) {
     };
     line("VÔLEI HUB", 12, true); line("Resultado de partida", 20, true); line(result.reason); y += 3;
     line("Classificação final", 15, true);
-    result.standings.forEach((team, index) => { const visual = resultVisualStats(result, team); line(`${index + 1}º ${team.name} — Jogos: ${visual.games} | Vitórias: ${team.wins} | Derrotas: ${visual.losses} | Pontos: ${team.points} | Saldo: ${team.difference >= 0 ? "+" : ""}${team.difference}`); });
-    y += 3; line("Participantes por equipe", 15, true);
+    const columns = [10, 62, 18, 18, 18, 24, 24];
+    const headers = ["#", "Equipe", "Jogos", "Vit.", "Der.", "Pontos", "Saldo"];
+    const drawRankingRow = (cells, header = false) => {
+      const height = 8;
+      if (y + height > 280) { pdf.addPage(); y = 18; }
+      let x = 18;
+      cells.forEach((cell, index) => {
+        pdf.setDrawColor(190, 200, 210);
+        pdf.setFillColor(header ? 30 : 255, header ? 41 : 255, header ? 59 : 255);
+        pdf.rect(x, y, columns[index], height, "F");
+        pdf.rect(x, y, columns[index], height, "S");
+        pdf.setTextColor(header ? 255 : 30, header ? 255 : 41, header ? 255 : 59);
+        pdf.setFont("helvetica", header ? "bold" : "normal"); pdf.setFontSize(header ? 8 : 8.5);
+        const text = pdf.splitTextToSize(String(cell), columns[index] - 3)[0] || "";
+        const centered = index !== 1;
+        if (centered) pdf.text(text, x + columns[index] / 2, y + 5.2, { align: "center" });
+        else pdf.text(text, x + 1.5, y + 5.2);
+        x += columns[index];
+      });
+      y += height;
+    };
+    drawRankingRow(headers, true);
+    result.standings.forEach((team, index) => {
+      const visual = resultVisualStats(result, team);
+      drawRankingRow([`${index + 1}º`, team.name, visual.games, team.wins, visual.losses, team.points, `${team.difference >= 0 ? "+" : ""}${team.difference}`]);
+    });
+    pdf.setTextColor(30, 41, 59);
+    y += 12; line("Participantes por equipe", 15, true);
     teamNames.forEach((team, teamIndex) => {
       const names = Array.from({ length: totalPlayers }, (_, playerIndex) => result.players?.[teamIndex]?.[playerIndex] || "Vazio");
       line(`${team}: ${names.join(", ")}`);
