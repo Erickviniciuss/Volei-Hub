@@ -154,6 +154,7 @@ body {
 .ranking-row, .result-ranking div { display: grid; grid-template-columns: 38px 1fr auto; align-items: center; gap: 18px; padding: 11px; border: 1px solid var(--line); border-radius: 10px; }
 .ranking-row.podium { border-color: var(--purple); background: var(--soft-card); }
 .ranking-row small, .result-ranking small { color: var(--muted); }
+.result-ranking div > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ranking-stats { display: flex; align-items: center; gap: 8px; margin-left: 8px; white-space: nowrap; }
 .ranking-stats span { display: grid; gap: 1px; padding: 4px 6px; border-radius: 6px; background: var(--soft-card); font-size: .72rem; text-align: center; }
 .ranking-stats b { color: var(--muted); font-size: .59rem; font-weight: 700; text-transform: uppercase; }
