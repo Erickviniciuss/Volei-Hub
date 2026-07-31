@@ -154,7 +154,7 @@ body {
 .ranking-row, .result-ranking div { display: grid; grid-template-columns: 38px 1fr auto; align-items: center; gap: 18px; padding: 11px; border: 1px solid var(--line); border-radius: 10px; }
 .ranking-row.podium { border-color: var(--purple); background: var(--soft-card); }
 .ranking-row small, .result-ranking small { color: var(--muted); }
-.result-ranking div > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.result-team-name { display: block; min-width: 78px; white-space: nowrap !important; word-break: keep-all; }
 .ranking-stats { display: flex; align-items: center; gap: 8px; margin-left: 8px; white-space: nowrap; }
 .ranking-stats span { display: grid; gap: 1px; padding: 4px 6px; border-radius: 6px; background: var(--soft-card); font-size: .72rem; text-align: center; }
 .ranking-stats b { color: var(--muted); font-size: .59rem; font-weight: 700; text-transform: uppercase; }
@@ -313,9 +313,10 @@ button:hover { background: var(--purple-dark); transform: translateY(-1px); }
   .top-home-button { min-height: 35px; padding: 0 9px; font-size: .74rem; }
   .score-card .team-dropdown summary { font-size: .84rem; }
   .ranking-row, .result-ranking div { grid-template-columns: 26px minmax(0, 1fr) auto; gap: 8px; padding: 8px 6px; }
+  .result-ranking div { grid-template-columns: 26px minmax(78px, 1fr) auto; gap: 5px; }
   .ranking-stats { grid-column: auto; gap: 2px; margin-left: 2px; }
-  .ranking-stats span { padding: 3px 4px; font-size: .61rem; }
-  .ranking-stats b { font-size: .49rem; }
+  .ranking-stats span { padding: 3px 3px; font-size: .58rem; }
+  .ranking-stats b { font-size: .46rem; }
   #finished-copy { white-space: nowrap; font-size: .72rem; }
   .field-group { max-width: none; }
   button { width: 100%; }

@@ -45,7 +45,7 @@ function renderResults() {
   const visible = results.slice(0, visibleResults);
   resultsList.innerHTML = visible.map((result) => {
     const date = new Date(result.finishedAt).toLocaleString("pt-BR");
-    return `<article class="result-card"><div class="result-card-heading"><div><p class="eyebrow">${date}</p><h2>${escapeResult(result.reason)}</h2></div><div class="result-actions"><button class="print-result" type="button" data-id="${result.id}">Enviar PDF</button><button class="delete-result" type="button" data-id="${result.id}">Excluir</button></div></div><div class="result-ranking">${result.standings.map((team, index) => `<div><strong>${index + 1}º</strong><span>${escapeResult(team.name)}</span>${resultStats(team, result)}</div>`).join("")}</div></article>`;
+    return `<article class="result-card"><div class="result-card-heading"><div><p class="eyebrow">${date}</p><h2>${escapeResult(result.reason)}</h2></div><div class="result-actions"><button class="print-result" type="button" data-id="${result.id}">Enviar PDF</button><button class="delete-result" type="button" data-id="${result.id}">Excluir</button></div></div><div class="result-ranking">${result.standings.map((team, index) => `<div><strong>${index + 1}º</strong><span class="result-team-name">${escapeResult(team.name)}</span>${resultStats(team, result)}</div>`).join("")}</div></article>`;
   }).join("") + (visible.length < results.length ? `<button id="show-more-results" class="show-more-results" type="button">Mostrar mais</button>` : "");
 }
 
