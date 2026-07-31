@@ -8,7 +8,13 @@ document.body.classList.remove("app-loading");
 
 function escapeViewer(value) { return String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#039;", '"': "&quot;" })[char]); }
 function scoreKeyViewer(round, game) { return `${round}-${game}`; }
-function viewerStats(team) { return `<small class="ranking-stats"><span><b>Jogos</b>${team.games}</span><span><b>Vit.</b>${team.wins}</span><span><b>Der.</b>${team.losses}</span><span><b>Pontos</b>${team.points}</span><span><b>Saldo</b>${team.difference >= 0 ? "+" : ""}${team.difference}</span></small>`; }
+function viewerStats(team) { return `<small class="ranking-stats"><span><b>Vit.</b>${team.wins}</span><span><b>Der.</b>${team.losses}</span><span><b>Jogos</b>${team.games}</span><span><b>Pontos</b>${team.points}</span><span><b>Saldo</b>${team.difference >= 0 ? "+" : ""}${team.difference}</span></small>`; }
+function viewerTeamDropdown(game, team, away = false) {
+  const teamIndex = (game.teams || []).indexOf(team);
+  const players = game.players?.[teamIndex] || [];
+  const content = players.length ? `<ul>${players.map((player) => `<li>${escapeViewer(player)}</li>`).join("")}</ul>` : "<span>Nenhum participante cadastrado.</span>";
+  return `<div class="team-dropdown ${away ? "team-away" : ""}"><details><summary>${escapeViewer(team)}</summary><div class="dropdown-menu"><strong>${escapeViewer(team)}</strong>${content}</div></details></div>`;
+}
 
 function standingsFor(game) {
   const names = new Set(game.teams || []);
@@ -35,7 +41,8 @@ function renderViewer(game) {
   viewerStatus.textContent = `Atualizado às ${new Date(game.updatedAt || Date.now()).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}.`;
   document.querySelector("#viewer-ranking").innerHTML = standingsFor(game).map((team, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong><span>${escapeViewer(team.name)}</span>${viewerStats(team)}</div>`).join("");
   const scores = new Map(game.scores || []);
-  document.querySelector("#viewer-rounds").innerHTML = game.schedule.map((round, roundIndex) => `<article class="round overview-round ${roundIndex === game.currentRound ? "is-current" : ""}"><header class="round-title">Rodada ${roundIndex + 1}<span>${roundIndex === game.currentRound ? "ATUAL" : roundIndex < game.currentRound ? "CONCLUÍDA" : "AGUARDANDO"}</span></header>${round.matches.map(([home, away], gameIndex) => { const score = scores.get(scoreKeyViewer(roundIndex, gameIndex)); const value = score && score[0] !== "" && score[1] !== "" ? `${score[0]} × ${score[1]}` : "×"; return `<div class="match overview-match"><span>${escapeViewer(home)}</span><span class="overview-score">${value}</span><span class="team-away">${escapeViewer(away)}</span></div>`; }).join("")}${round.bye ? `<div class="bye">Folga: <strong>${escapeViewer(round.bye)}</strong></div>` : ""}</article>`).join("");
+  const currentGame = Number(game.confirmedGameCount) || 0;
+  document.querySelector("#viewer-rounds").innerHTML = game.schedule.map((round, roundIndex) => `<article class="round overview-round ${roundIndex === game.currentRound ? "is-current" : ""}"><header class="round-title">Rodada ${roundIndex + 1}<span>${roundIndex === game.currentRound ? "ATUAL" : roundIndex < game.currentRound ? "CONCLUÍDA" : "AGUARDANDO"}</span></header>${round.matches.map(([home, away], gameIndex) => { const score = scores.get(scoreKeyViewer(roundIndex, gameIndex)); const value = score && score[0] !== "" && score[1] !== "" ? `${score[0]} × ${score[1]}` : "×"; return `<div class="match overview-match ${roundIndex === game.currentRound && gameIndex === currentGame ? "is-current-match" : ""}">${viewerTeamDropdown(game, home)}<span class="overview-score">${value}</span>${viewerTeamDropdown(game, away, true)}</div>`; }).join("")}${round.bye ? `<div class="bye">Folga: <strong>${escapeViewer(round.bye)}</strong></div>` : ""}</article>`).join("");
   viewerContent.hidden = false;
 }
 
@@ -57,3 +64,9 @@ else {
   }).subscribe();
   window.setInterval(loadViewerGame, 10000);
 }
+
+document.querySelector("#viewer-rounds").addEventListener("click", (event) => {
+  const selected = event.target.closest("details");
+  if (!selected) return;
+  document.querySelectorAll("#viewer-rounds details[open]").forEach((details) => { if (details !== selected) details.removeAttribute("open"); });
+});

@@ -92,7 +92,7 @@ function buildQuickSchedule(teams, rounds, initialBye = null) {
 }
 
 function scoreKey(round, game) { return `${round}-${game}`; }
-function rankingStats(team) { return `<small class="ranking-stats"><span><b>Jogos</b>${team.games}</span><span><b>Vit.</b>${team.wins}</span><span><b>Der.</b>${team.losses}</span><span><b>Pontos</b>${team.points}</span><span><b>Saldo</b>${team.difference >= 0 ? "+" : ""}${team.difference}</span></small>`; }
+function rankingStats(team) { return `<small class="ranking-stats"><span><b>Vit.</b>${team.wins}</span><span><b>Der.</b>${team.losses}</span><span><b>Jogos</b>${team.games}</span><span><b>Pontos</b>${team.points}</span><span><b>Saldo</b>${team.difference >= 0 ? "+" : ""}${team.difference}</span></small>`; }
 function saveQuickGame() {
   const game = { status: "active", shareCode: currentShareCode, schedule: quickSchedule, currentRound, confirmedGameCount, scores: [...scores.entries()], teams: currentTeams, playerCount: currentPlayerCount, players: currentPlayers };
   window.quickGameStore.saveActive(game);
@@ -230,7 +230,7 @@ function applyLiveSettings() {
 
 function renderOverview() {
   document.querySelector("#save-retro-scores").hidden = !retroEditingUnlocked;
-  overviewRounds.innerHTML = quickSchedule.map((round, index) => `<article class="round overview-round ${index === currentRound ? "is-current" : ""}"><header class="round-title">Rodada ${index + 1}<span>${index === currentRound ? "ATUAL" : index < currentRound ? "CONCLUÍDA" : "AGUARDANDO"}</span></header>${round.matches.map(([home, away], gameIndex) => { const result = scores.get(scoreKey(index, gameIndex)); const editable = retroEditingUnlocked && index < currentRound; const score = result && result[0] !== "" && result[1] !== "" ? `${result[0]} × ${result[1]}` : "×"; return editable ? `<div class="match overview-match retro-match"><span>${escapeQuick(home)}</span><span class="retro-score-inputs"><input data-retro-round="${index}" data-retro-game="${gameIndex}" data-side="0" type="number" min="0" value="${result?.[0] ?? ""}" aria-label="Novo placar de ${escapeQuick(home)}" /><b>×</b><input data-retro-round="${index}" data-retro-game="${gameIndex}" data-side="1" type="number" min="0" value="${result?.[1] ?? ""}" aria-label="Novo placar de ${escapeQuick(away)}" /></span><span class="team-away">${escapeQuick(away)}</span></div>` : `<div class="match overview-match"><span>${escapeQuick(home)}</span><span class="overview-score">${score}</span><span class="team-away">${escapeQuick(away)}</span></div>`; }).join("")}${round.bye ? `<div class="bye">Folga: <strong>${escapeQuick(round.bye)}</strong></div>` : ""}</article>`).join("");
+  overviewRounds.innerHTML = quickSchedule.map((round, index) => `<article class="round overview-round ${index === currentRound ? "is-current" : ""}"><header class="round-title">Rodada ${index + 1}<span>${index === currentRound ? "ATUAL" : index < currentRound ? "CONCLUÍDA" : "AGUARDANDO"}</span></header>${round.matches.map(([home, away], gameIndex) => { const result = scores.get(scoreKey(index, gameIndex)); const editable = retroEditingUnlocked && index < currentRound; const currentGame = index === currentRound && gameIndex === confirmedGameCount; const score = result && result[0] !== "" && result[1] !== "" ? `${result[0]} × ${result[1]}` : "×"; return editable ? `<div class="match overview-match retro-match"><span>${escapeQuick(home)}</span><span class="retro-score-inputs"><input data-retro-round="${index}" data-retro-game="${gameIndex}" data-side="0" type="number" min="0" value="${result?.[0] ?? ""}" aria-label="Novo placar de ${escapeQuick(home)}" /><b>×</b><input data-retro-round="${index}" data-retro-game="${gameIndex}" data-side="1" type="number" min="0" value="${result?.[1] ?? ""}" aria-label="Novo placar de ${escapeQuick(away)}" /></span><span class="team-away">${escapeQuick(away)}</span></div>` : `<div class="match overview-match ${currentGame ? "is-current-match" : ""}"><span>${escapeQuick(home)}</span><span class="overview-score">${score}</span><span class="team-away">${escapeQuick(away)}</span></div>`; }).join("")}${round.bye ? `<div class="bye">Folga: <strong>${escapeQuick(round.bye)}</strong></div>` : ""}</article>`).join("");
 }
 
 async function unlockRetroEditing() {
@@ -274,45 +274,45 @@ function saveRetroScores() {
   renderOverview();
 }
 
-function printQuickGamePdf() {
+async function printQuickGamePdf() {
+  if (!quickSchedule.length) return;
   const Pdf = window.jspdf?.jsPDF;
-  if (!Pdf) { window.alert("Não foi possível preparar o PDF. Verifique sua conexão e tente novamente."); return; }
-  const pdf = new Pdf({ unit: "mm", format: "a4" });
-  let y = 18;
-  const line = (text, size = 10, bold = false) => {
-    pdf.setFont("helvetica", bold ? "bold" : "normal"); pdf.setFontSize(size);
-    const lines = pdf.splitTextToSize(text, 175);
-    if (y + lines.length * 6 > 280) { pdf.addPage(); y = 18; }
-    pdf.text(lines, 18, y); y += lines.length * 6;
-  };
-  line("VÔLEI HUB", 12, true); line("Jogo Rápido", 22, true); line(`Rodada atual: ${Math.min(currentRound + 1, quickSchedule.length)} de ${quickSchedule.length}`); y += 3;
-  line("Ranking atual", 15, true);
-  buildStandings().forEach((team, index) => line(`${index + 1}º  ${team.name} — Jogos: ${team.games} | Vitórias: ${team.wins} | Derrotas: ${team.losses} | Pontos: ${team.points} | Saldo: ${team.difference >= 0 ? "+" : ""}${team.difference}`));
-  y += 4; line("Participantes", 15, true);
-  currentTeams.forEach((team, index) => {
-    const players = currentPlayers[index] || [];
-    const names = Array.from({ length: currentPlayerCount }, (_, playerIndex) => players[playerIndex] || "Vazio");
-    line(`${team}: ${names.join(", ")}`);
-  });
-  y += 4; line("Rodadas", 15, true);
-  quickSchedule.forEach((round, roundIndex) => {
-    line(`Rodada ${roundIndex + 1}`, 13, true);
-    round.matches.forEach(([home, away], gameIndex) => {
-      const result = scores.get(scoreKey(roundIndex, gameIndex));
-      const score = result && result[0] !== "" && result[1] !== "" ? `${result[0]} × ${result[1]}` : "×";
-      line(`${home}    ${score}    ${away}`);
+  if (Pdf) {
+    const pdf = new Pdf({ unit: "mm", format: "a4" }); let y = 18;
+    const line = (text, size = 10, bold = false) => {
+      pdf.setFont("helvetica", bold ? "bold" : "normal"); pdf.setFontSize(size);
+      const lines = pdf.splitTextToSize(text, 175);
+      if (y + lines.length * 6 > 280) { pdf.addPage(); y = 18; }
+      pdf.text(lines, 18, y); y += lines.length * 6;
+    };
+    line("VÔLEI HUB", 12, true); line("Tabelas do Jogo Rápido", 20, true);
+    quickSchedule.forEach((round, roundIndex) => {
+      line(`Rodada ${roundIndex + 1}`, 13, true);
+      round.matches.forEach(([home, away], gameIndex) => {
+        const result = scores.get(scoreKey(roundIndex, gameIndex)); const score = result && result[0] !== "" && result[1] !== "" ? `${result[0]} × ${result[1]}` : "×";
+        line(`${home}    ${score}    ${away}`);
+      });
+      if (round.bye) line(`Folga: ${round.bye}`, 9);
+      y += 3;
     });
-    if (round.bye) line(`Folga: ${round.bye}`, 9);
-    y += 3;
-  });
-  const url = URL.createObjectURL(pdf.output("blob"));
-  window.open(url, "_blank", "noopener");
-  window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    const file = new File([pdf.output("blob")], "tabelas-jogo-rapido.pdf", { type: "application/pdf" });
+    if (navigator.canShare?.({ files: [file] })) {
+      try { await navigator.share({ title: "Tabelas do Jogo Rápido", text: "Tabelas de jogos do Vôlei Hub.", files: [file] }); return; }
+      catch (error) { if (error.name === "AbortError") return; }
+    }
+  }
+  const report = window.open("", "_blank");
+  if (!report) { window.alert("Permita a abertura de janelas para imprimir o PDF."); return; }
+  report.document.open();
+  const rounds = quickSchedule.map((round, roundIndex) => `<section class="round"><h2>Rodada ${roundIndex + 1}</h2>${round.matches.map(([home, away], gameIndex) => { const result = scores.get(scoreKey(roundIndex, gameIndex)); const score = result && result[0] !== "" && result[1] !== "" ? `${result[0]} × ${result[1]}` : "×"; return `<div class="match"><span>${escapeQuick(home)}</span><strong>${score}</strong><span>${escapeQuick(away)}</span></div>`; }).join("")}${round.bye ? `<p>Folga: <b>${escapeQuick(round.bye)}</b></p>` : ""}</section>`).join("");
+  report.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Tabelas do Jogo Rápido</title><style>body{font-family:Arial,sans-serif;color:#1e293b;margin:36px}h1{font-size:30px}.round{break-inside:avoid;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin:16px 0}.round h2{margin:0 0 12px}.match{display:grid;grid-template-columns:1fr auto 1fr;gap:18px;padding:9px 0;border-bottom:1px solid #e2e8f0}.match span:last-child{text-align:right}.match strong{color:#0e7490}@media print{body{margin:18px}}</style></head><body><p>VÔLEI HUB · JOGO RÁPIDO</p><h1>Tabelas de jogos</h1>${rounds}</body></html>`);
+  report.document.close();
+  window.setTimeout(() => { report.focus(); report.print(); }, 300);
 }
 
 async function finishQuickGame(message) {
   const standings = buildStandings();
-  const result = { id: Date.now(), finishedAt: new Date().toISOString(), reason: message, standings, schedule: quickSchedule, scores: [...scores.entries()] };
+  const result = { id: Date.now(), finishedAt: new Date().toISOString(), reason: message, standings, schedule: quickSchedule, scores: [...scores.entries()], teams: currentTeams, players: currentPlayers, playerCount: currentPlayerCount };
   window.quickGameStore.addResult(result);
   const { error } = await window.quickGameStore.saveResultToCloud(result);
   if (error) console.warn("Não foi possível salvar o resultado no Supabase.", error);
