@@ -1,4 +1,6 @@
 -- Execute este script no SQL Editor do projeto Supabase.
+
+-- Tabela de Histórico de Resultados
 create table if not exists public.game_results (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade default auth.uid(),
@@ -16,26 +18,31 @@ drop policy if exists "Users can create their own game results" on public.game_r
 drop policy if exists "Users can update their own game results" on public.game_results;
 drop policy if exists "Users can delete their own game results" on public.game_results;
 
+-- Otimização RLS: O uso de (select auth.uid()) avalia a função 1 vez por consulta em vez de 1 vez por linha analisada.
 create policy "Users can read their own game results"
   on public.game_results for select
   to authenticated
-  using (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id);
 
 create policy "Users can create their own game results"
   on public.game_results for insert
   to authenticated
-  with check (auth.uid() = user_id);
+  with check ((select auth.uid()) = user_id);
 
 create policy "Users can update their own game results"
   on public.game_results for update
   to authenticated
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 
 create policy "Users can delete their own game results"
   on public.game_results for delete
   to authenticated
-  using (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id);
+
+-- Índices de desempenho para game_results
+create index if not exists idx_game_results_user_id on public.game_results (user_id);
+create index if not exists idx_game_results_finished_at on public.game_results (finished_at desc);
 
 -- Partidas em andamento compartilhadas por código de acompanhamento.
 create table if not exists public.live_games (
@@ -56,13 +63,32 @@ drop policy if exists "Anyone can view active live games" on public.live_games;
 create policy "Owners manage their live games"
   on public.live_games for all
   to authenticated
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 
 create policy "Anyone can view active live games"
   on public.live_games for select
   to anon, authenticated
   using (is_active = true);
+
+-- Índices de desempenho para live_games
+create index if not exists idx_live_games_user_id on public.live_games (user_id);
+create index if not exists idx_live_games_share_code_active on public.live_games (share_code) where is_active = true;
+
+-- Trigger para atualizar automaticamente o campo updated_at no banco
+create or replace function public.handle_updated_at()
+returns trigger as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists set_live_games_updated_at on public.live_games;
+create trigger set_live_games_updated_at
+  before update on public.live_games
+  for each row
+  execute function public.handle_updated_at();
 
 grant select on public.live_games to anon, authenticated;
 grant insert, update, delete on public.live_games to authenticated;
