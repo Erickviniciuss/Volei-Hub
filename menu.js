@@ -8,6 +8,7 @@ const emailNode = document.querySelector("#account-email");
 const logoutButton = document.querySelector("#logout-button");
 const themeToggle = document.querySelector("#theme-toggle");
 let currentUser = null;
+let sessionChecked = false;
 
 function applyTheme(theme) {
   const dark = theme === "dark";
@@ -35,12 +36,17 @@ function updateAccount(user) {
 if (!menuSupabase) returnToLogin();
 else {
   menuSupabase.auth.getSession().then(({ data }) => {
+    sessionChecked = true;
     if (!data.session) returnToLogin();
     else { updateAccount(data.session.user); document.body.classList.remove("app-loading"); }
-  });
-  menuSupabase.auth.onAuthStateChange((_event, session) => {
-    if (!session) returnToLogin();
-    else updateAccount(session.user);
+  }).catch(() => { sessionChecked = true; returnToLogin(); });
+  menuSupabase.auth.onAuthStateChange((event, session) => {
+    if (session) {
+      updateAccount(session.user);
+      document.body.classList.remove("app-loading");
+    } else if (event === "SIGNED_OUT" && sessionChecked) {
+      returnToLogin();
+    }
   });
 }
 
