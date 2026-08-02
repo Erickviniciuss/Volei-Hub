@@ -8,15 +8,23 @@ const tableSupabase = tableHasKey && window.supabase
 function returnToLogin() {
   window.location.replace("login.html");
 }
+function waitForTableSession(milliseconds) { return new Promise((resolve) => window.setTimeout(resolve, milliseconds)); }
 
 if (!tableSupabase) {
   returnToLogin();
 } else {
-  tableSupabase.auth.getSession().then(({ data }) => {
-    if (!data.session) returnToLogin();
-    else document.body.classList.remove("app-loading");
-  });
-  tableSupabase.auth.onAuthStateChange((_event, session) => {
-    if (!session) returnToLogin();
+  let tableSessionChecked = false;
+  (async () => {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const { data } = await tableSupabase.auth.getSession();
+      if (data.session) { tableSessionChecked = true; document.body.classList.remove("app-loading"); return; }
+      if (attempt < 2) await waitForTableSession(350);
+    }
+    tableSessionChecked = true;
+    returnToLogin();
+  })().catch(() => { tableSessionChecked = true; returnToLogin(); });
+  tableSupabase.auth.onAuthStateChange((event, session) => {
+    if (session) document.body.classList.remove("app-loading");
+    else if (event === "SIGNED_OUT" && tableSessionChecked) returnToLogin();
   });
 }

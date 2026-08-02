@@ -18,6 +18,7 @@ function applyTheme(theme) {
 }
 
 function returnToLogin() { window.location.replace("login.html"); }
+function waitForSession(milliseconds) { return new Promise((resolve) => window.setTimeout(resolve, milliseconds)); }
 
 function renderCurrentGame() {
   const game = window.quickGameStore.getActive();
@@ -35,11 +36,20 @@ function updateAccount(user) {
 
 if (!menuSupabase) returnToLogin();
 else {
-  menuSupabase.auth.getSession().then(({ data }) => {
+  (async () => {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const { data } = await menuSupabase.auth.getSession();
+      if (data.session) {
+        sessionChecked = true;
+        updateAccount(data.session.user);
+        document.body.classList.remove("app-loading");
+        return;
+      }
+      if (attempt < 2) await waitForSession(350);
+    }
     sessionChecked = true;
-    if (!data.session) returnToLogin();
-    else { updateAccount(data.session.user); document.body.classList.remove("app-loading"); }
-  }).catch(() => { sessionChecked = true; returnToLogin(); });
+    returnToLogin();
+  })().catch(() => { sessionChecked = true; returnToLogin(); });
   menuSupabase.auth.onAuthStateChange((event, session) => {
     if (session) {
       updateAccount(session.user);
