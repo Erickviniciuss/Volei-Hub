@@ -5,12 +5,7 @@ const menuSupabase = menuHasKey && window.supabase
   : null;
 const nameNode = document.querySelector("#account-name");
 const emailNode = document.querySelector("#account-email");
-const editButton = document.querySelector("#edit-account-button");
 const logoutButton = document.querySelector("#logout-button");
-const accountDialog = document.querySelector("#account-dialog");
-const closeDialog = document.querySelector("#close-dialog");
-const accountForm = document.querySelector("#account-form");
-const accountMessage = document.querySelector("#account-message");
 const themeToggle = document.querySelector("#theme-toggle");
 let currentUser = null;
 
@@ -35,8 +30,6 @@ function updateAccount(user) {
   currentUser = user;
   nameNode.textContent = user.user_metadata?.display_name || user.email;
   emailNode.textContent = user.email;
-  document.querySelector("#account-edit-name").value = user.user_metadata?.display_name || "";
-  document.querySelector("#account-edit-email").value = user.email || "";
 }
 
 if (!menuSupabase) returnToLogin();
@@ -53,18 +46,4 @@ else {
 
 renderCurrentGame();
 
-editButton.addEventListener("click", () => { accountMessage.textContent = ""; accountDialog.showModal(); });
-closeDialog.addEventListener("click", () => accountDialog.close());
 logoutButton.addEventListener("click", async () => { if (menuSupabase) await menuSupabase.auth.signOut({ scope: "local" }); });
-accountForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  if (!menuSupabase || !currentUser) return;
-  const name = document.querySelector("#account-edit-name").value.trim();
-  const email = document.querySelector("#account-edit-email").value.trim();
-  const emailChanged = email !== currentUser.email;
-  const { data, error } = await menuSupabase.auth.updateUser({ email, data: { display_name: name } });
-  if (error) { accountMessage.textContent = error.message; accountMessage.className = "auth-message is-error"; return; }
-  updateAccount(data.user);
-  accountMessage.textContent = emailChanged ? "Cadastro salvo. Confirme o novo e-mail, se solicitado." : "Cadastro salvo.";
-  accountMessage.className = "auth-message is-success";
-});

@@ -22,6 +22,7 @@ let currentPlayers = [];
 let currentShareCode = "";
 let confirmedGameCount = 0;
 let retroEditingUnlocked = false;
+let gameStartedAt = "";
 
 function escapeQuick(value) { return String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#039;", '"': "&quot;" })[char]); }
 function maxQuickRounds(total) { return total % 2 === 0 ? total - 1 : total; }
@@ -30,6 +31,11 @@ function generateShareCode() {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   const values = crypto.getRandomValues(new Uint8Array(8));
   return `VH-${[...values].map((value) => alphabet[value % alphabet.length]).join("")}`;
+}
+function gamePdfFileName(date = new Date()) {
+  const value = new Date(date);
+  const pad = (number) => String(number).padStart(2, "0");
+  return `Volei Hub - ${pad(value.getDate())}-${pad(value.getMonth() + 1)}-${value.getFullYear()} ${pad(value.getHours())}h${pad(value.getMinutes())}.pdf`;
 }
 
 function makeQuickTeamInputs() {
@@ -91,10 +97,30 @@ function buildQuickSchedule(teams, rounds, initialBye = null) {
   });
 }
 
+function buildExpandedSchedule(previousRound, previousTeams, nextTeams, futureRounds) {
+  if (!futureRounds) return [];
+  const newTeam = nextTeams.slice(previousTeams.length)[0];
+  if (!newTeam || !previousRound?.matches?.length) return buildQuickSchedule(nextTeams, futureRounds, previousRound?.bye || null);
+
+  const lastMatch = previousRound.matches.at(-1);
+  const bye = nextTeams.length % 2 !== 0 ? lastMatch?.[1] || lastMatch?.[0] || null : null;
+  const previousOrder = [...previousRound.matches.flat(), ...(previousRound.bye ? [previousRound.bye] : [])];
+  const opponent = previousOrder.find((team) => team !== bye && team !== newTeam) || nextTeams.find((team) => team !== bye && team !== newTeam);
+  const remaining = nextTeams.filter((team) => team !== newTeam && team !== opponent && team !== bye);
+  const matches = [[newTeam, opponent]];
+  for (let index = 0; index < remaining.length; index += 2) {
+    if (remaining[index] && remaining[index + 1]) matches.push([remaining[index], remaining[index + 1]]);
+  }
+
+  // A equipe adicionada abre a próxima rodada; em totais ímpares, a folga
+  // fica com uma das duas equipes que encerrou a rodada anterior.
+  return [{ matches, bye, phase: 0 }, ...buildQuickSchedule(nextTeams, futureRounds - 1, bye)];
+}
+
 function scoreKey(round, game) { return `${round}-${game}`; }
 function rankingStats(team) { return `<small class="ranking-stats"><span><b>Vit.</b>${team.wins}</span><span><b>Der.</b>${team.losses}</span><span><b>Jogos</b>${team.games}</span><span><b>Pontos</b>${team.points}</span><span><b>Saldo</b>${team.difference >= 0 ? "+" : ""}${team.difference}</span></small>`; }
 function saveQuickGame() {
-  const game = { status: "active", shareCode: currentShareCode, schedule: quickSchedule, currentRound, confirmedGameCount, scores: [...scores.entries()], teams: currentTeams, playerCount: currentPlayerCount, players: currentPlayers };
+  const game = { status: "active", shareCode: currentShareCode, startedAt: gameStartedAt, schedule: quickSchedule, currentRound, confirmedGameCount, scores: [...scores.entries()], teams: currentTeams, playerCount: currentPlayerCount, players: currentPlayers };
   window.quickGameStore.saveActive(game);
   window.quickGameStore.saveLiveGame(game).then(({ error }) => {
     const status = document.querySelector("#share-code-status");
@@ -217,10 +243,11 @@ function applyLiveSettings() {
     const requestedTotal = Math.max(currentRound + 1, Number(document.querySelector("#live-round-count").value) || currentRound + 1);
     const preserved = quickSchedule.slice(0, currentRound + 1);
     const futureRounds = requestedTotal - preserved.length;
-    const activeBye = quickSchedule[currentRound]?.bye || null;
+    const activeRound = quickSchedule[currentRound];
+    const previousTeams = currentTeams;
     currentTeams = liveTeams;
     // Somente a alteração da quantidade de equipes refaz as próximas rodadas.
-    quickSchedule = [...preserved, ...buildQuickSchedule(currentTeams, futureRounds, activeBye)];
+    quickSchedule = [...preserved, ...buildExpandedSchedule(activeRound, previousTeams, currentTeams, futureRounds)];
   }
   document.querySelector("#live-settings").hidden = true;
   document.querySelector("#adjust-game-toggle").setAttribute("aria-expanded", "false");
@@ -285,7 +312,7 @@ async function printQuickGamePdf() {
       if (y + lines.length * 6 > 280) { pdf.addPage(); y = 18; }
       pdf.text(lines, 18, y); y += lines.length * 6;
     };
-    line("VÔLEI HUB", 12, true); line("Tabelas do Jogo Rápido", 20, true);
+    line("VÔLEI HUB", 12, true); line("Tabelas do Jogo por Resultado", 20, true);
     quickSchedule.forEach((round, roundIndex) => {
       line(`Rodada ${roundIndex + 1}`, 13, true);
       round.matches.forEach(([home, away], gameIndex) => {
@@ -295,9 +322,9 @@ async function printQuickGamePdf() {
       if (round.bye) line(`Folga: ${round.bye}`, 9);
       y += 3;
     });
-    const file = new File([pdf.output("blob")], "tabelas-jogo-rapido.pdf", { type: "application/pdf" });
+    const file = new File([pdf.output("blob")], gamePdfFileName(gameStartedAt || new Date()), { type: "application/pdf" });
     if (navigator.canShare?.({ files: [file] })) {
-      try { await navigator.share({ title: "Tabelas do Jogo Rápido", text: "Tabelas de jogos do Vôlei Hub.", files: [file] }); return; }
+      try { await navigator.share({ title: "Tabelas do Jogo por Resultado", text: "Tabelas de jogos do Vôlei Hub.", files: [file] }); return; }
       catch (error) { if (error.name === "AbortError") return; }
     }
   }
@@ -305,14 +332,14 @@ async function printQuickGamePdf() {
   if (!report) { window.alert("Permita a abertura de janelas para imprimir o PDF."); return; }
   report.document.open();
   const rounds = quickSchedule.map((round, roundIndex) => `<section class="round"><h2>Rodada ${roundIndex + 1}</h2>${round.matches.map(([home, away], gameIndex) => { const result = scores.get(scoreKey(roundIndex, gameIndex)); const score = result && result[0] !== "" && result[1] !== "" ? `${result[0]} × ${result[1]}` : "×"; return `<div class="match"><span>${escapeQuick(home)}</span><strong>${score}</strong><span>${escapeQuick(away)}</span></div>`; }).join("")}${round.bye ? `<p>Folga: <b>${escapeQuick(round.bye)}</b></p>` : ""}</section>`).join("");
-  report.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Tabelas do Jogo Rápido</title><style>body{font-family:Arial,sans-serif;color:#1e293b;margin:36px}h1{font-size:30px}.round{break-inside:avoid;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin:16px 0}.round h2{margin:0 0 12px}.match{display:grid;grid-template-columns:1fr auto 1fr;gap:18px;padding:9px 0;border-bottom:1px solid #e2e8f0}.match span:last-child{text-align:right}.match strong{color:#0e7490}@media print{body{margin:18px}}</style></head><body><p>VÔLEI HUB · JOGO RÁPIDO</p><h1>Tabelas de jogos</h1>${rounds}</body></html>`);
+  report.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Tabelas do Jogo por Resultado</title><style>body{font-family:Arial,sans-serif;color:#1e293b;margin:36px}h1{font-size:30px}.round{break-inside:avoid;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin:16px 0}.round h2{margin:0 0 12px}.match{display:grid;grid-template-columns:1fr auto 1fr;gap:18px;padding:9px 0;border-bottom:1px solid #e2e8f0}.match span:last-child{text-align:right}.match strong{color:#0e7490}@media print{body{margin:18px}}</style></head><body><p>VÔLEI HUB · JOGO POR RESULTADO</p><h1>Tabelas de jogos</h1>${rounds}</body></html>`);
   report.document.close();
   window.setTimeout(() => { report.focus(); report.print(); }, 300);
 }
 
 async function finishQuickGame(message) {
   const standings = buildStandings();
-  const result = { id: Date.now(), finishedAt: new Date().toISOString(), reason: message, standings, schedule: quickSchedule, scores: [...scores.entries()], teams: currentTeams, players: currentPlayers, playerCount: currentPlayerCount };
+  const result = { id: Date.now(), startedAt: gameStartedAt, finishedAt: new Date().toISOString(), reason: message, standings, schedule: quickSchedule, scores: [...scores.entries()], teams: currentTeams, players: currentPlayers, playerCount: currentPlayerCount };
   window.quickGameStore.addResult(result);
   const { error } = await window.quickGameStore.saveResultToCloud(result);
   if (error) console.warn("Não foi possível salvar o resultado no Supabase.", error);
@@ -337,7 +364,7 @@ document.querySelector("#quick-start").addEventListener("click", () => {
   const teams = [...document.querySelectorAll(".quick-team-name")].map((input, index) => input.value.trim() || `Equipe ${index + 1}`);
   const rounds = normalizeQuickRounds(quickRoundCount.value, maxQuickRounds(teams.length), quickUnlimited.checked);
   if (window.quickGameStore.getActive()?.status === "active") return;
-  quickRoundCount.value = rounds; currentTeams = teams; currentPlayerCount = Number(quickPlayerCount.value); currentPlayers = getQuickPlayers(); currentShareCode = generateShareCode(); quickSchedule = buildQuickSchedule(teams, rounds); currentRound = 0; confirmedGameCount = 0; scores = new Map(); saveQuickGame();
+  quickRoundCount.value = rounds; currentTeams = teams; currentPlayerCount = Number(quickPlayerCount.value); currentPlayers = getQuickPlayers(); currentShareCode = generateShareCode(); gameStartedAt = new Date().toISOString(); quickSchedule = buildQuickSchedule(teams, rounds); currentRound = 0; confirmedGameCount = 0; scores = new Map(); saveQuickGame();
   quickSetup.hidden = true; quickGame.hidden = false; renderCurrentRound();
 });
 currentMatches.addEventListener("input", persistPartialScores);
@@ -391,6 +418,24 @@ makeQuickTeamInputs();
 
 const savedQuickGame = window.quickGameStore.getActive();
 if (savedQuickGame?.status === "active") {
-  quickSchedule = savedQuickGame.schedule; currentRound = savedQuickGame.currentRound; confirmedGameCount = savedQuickGame.confirmedGameCount || 0; scores = new Map(savedQuickGame.scores || []); currentTeams = savedQuickGame.teams || []; currentPlayerCount = savedQuickGame.playerCount || 4; currentPlayers = savedQuickGame.players || currentTeams.map(() => []); currentShareCode = savedQuickGame.shareCode || generateShareCode(); confirmedGameCount = Math.min(confirmedGameCount, Math.max(0, (quickSchedule[currentRound]?.matches.length || 1) - 1)); saveQuickGame();
+  quickSchedule = savedQuickGame.schedule; currentRound = savedQuickGame.currentRound; confirmedGameCount = savedQuickGame.confirmedGameCount || 0; scores = new Map(savedQuickGame.scores || []); currentTeams = savedQuickGame.teams || []; currentPlayerCount = savedQuickGame.playerCount || 4; currentPlayers = savedQuickGame.players || currentTeams.map(() => []); currentShareCode = savedQuickGame.shareCode || generateShareCode(); gameStartedAt = savedQuickGame.startedAt || new Date().toISOString(); confirmedGameCount = Math.min(confirmedGameCount, Math.max(0, (quickSchedule[currentRound]?.matches.length || 1) - 1)); saveQuickGame();
   quickSetup.hidden = true; quickGame.hidden = false; renderCurrentRound();
+} else {
+  try {
+    const imported = JSON.parse(localStorage.getItem("volley-generator-import") || "null");
+    if (imported?.teams?.length >= 3 && imported.teams.length <= 8) {
+      quickTeamCount.value = imported.teams.length;
+      quickPlayerCount.value = Math.max(3, Math.min(6, Number(imported.playerCount) || 4));
+      makeQuickTeamInputs();
+      document.querySelectorAll(".quick-team-name").forEach((input, index) => { input.value = imported.teams[index] || `Equipe ${index + 1}`; });
+      makeQuickPlayerInputs();
+      document.querySelectorAll(".quick-player-name").forEach((input) => {
+        input.value = imported.players?.[Number(input.dataset.team)]?.[Number(input.dataset.playerKey.split("-")[1])] || "";
+      });
+      quickPlayersPanel.hidden = false;
+      quickPlayersToggle.setAttribute("aria-expanded", "true");
+      quickPlayersToggle.textContent = "Ocultar participantes";
+      localStorage.removeItem("volley-generator-import");
+    }
+  } catch { localStorage.removeItem("volley-generator-import"); }
 }

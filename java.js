@@ -12,6 +12,12 @@ const roundsContainer = document.querySelector("#rounds");
 const summary = document.querySelector("#schedule-summary");
 let generatedSchedule = [];
 
+function tablePdfFileName(date = new Date()) {
+  const value = new Date(date);
+  const pad = (number) => String(number).padStart(2, "0");
+  return `Volei Hub - ${pad(value.getDate())}-${pad(value.getMonth() + 1)}-${value.getFullYear()} ${pad(value.getHours())}h${pad(value.getMinutes())}.pdf`;
+}
+
 function escapeHtml(value) {
   return String(value).replace(/[&<>'"]/g, (character) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#039;", '"': "&quot;",
@@ -194,7 +200,7 @@ async function printGeneratedTable() {
     if (round.bye) addLine(`Folga: ${round.bye}`, 9);
     y += 4;
   });
-  const file = new File([pdf.output("blob")], "tabela-volei-hub.pdf", { type: "application/pdf" });
+  const file = new File([pdf.output("blob")], tablePdfFileName(), { type: "application/pdf" });
   const shareData = { title: "Tabela de jogos - Vôlei Hub", text: "Tabela de jogos do Vôlei Hub.", files: [file] };
   if (navigator.canShare?.({ files: [file] })) {
     try { await navigator.share(shareData); } catch (error) { if (error.name !== "AbortError") window.alert("Não foi possível abrir o compartilhamento."); }

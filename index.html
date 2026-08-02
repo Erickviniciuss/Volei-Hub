@@ -11,60 +11,35 @@
     <link rel="icon" type="image/png" href="assets/favicon.png" />
   </head>
   <body class="app-loading" data-theme="dark">
-    <main class="menu-shell">
-      <aside class="sidebar" aria-label="Menu do sistema">
-        <a class="brand" href="index.html">VÔLEI<br /><span>HUB</span></a>
-        <img class="sidebar-logo" data-theme-logo src="assets/logo_escuro.png" alt="Vôlei Hub" />
-        <nav class="system-nav">
-          <a class="nav-item is-active" href="tabela.htm"><span aria-hidden="true">▦</span> Tabela</a>
-          <a class="nav-item" href="jogo.html"><span aria-hidden="true">▶</span> Jogo Rápido</a>
-          <a class="nav-item" href="resultados.html"><span aria-hidden="true">★</span> Resultados</a>
-        </nav>
-        <details id="current-game-menu" class="current-game-menu" hidden>
-          <summary>Partida atual</summary>
-          <div id="current-game-info"></div>
-        </details>
-        <button id="logout-button" class="sidebar-action" type="button">↩ Voltar ao login</button>
-      </aside>
-      <section class="menu-content">
-        <header class="menu-header">
-          <div class="account-card">
-            <strong id="account-name">Carregando…</strong>
-            <span id="account-email"></span>
-            <div class="account-actions">
-              <button id="edit-account-button" type="button">Editar cadastro</button>
-              <button id="theme-toggle" type="button" aria-pressed="true">☀</button>
-            </div>
-          </div>
-          <div>
-            <p class="eyebrow">PAINEL PRINCIPAL</p>
-            <h1>Seu campeonato<br />começa aqui.</h1>
-          </div>
-        </header>
-        <section class="menu-welcome">
-          <p class="eyebrow">PRÓXIMO PASSO</p>
-          <h2>Monte sua tabela de jogos</h2>
-          <p>Defina as equipes, os participantes e as rodadas do seu campeonato.</p>
-          <a class="start-table-button" href="tabela.htm">Abrir tabela <span aria-hidden="true">→</span></a>
-        </section>
-      </section>
-    </main>
-    <footer class="site-footer">© 2026 RST Code. Todos os direitos reservados.</footer>
-
-    <dialog id="account-dialog" class="account-dialog">
-      <form id="account-form" method="dialog">
-        <div class="dialog-heading">
-          <div><p class="eyebrow">MINHA CONTA</p><h2>Editar cadastro</h2></div>
-          <button id="close-dialog" class="dialog-close" type="button" aria-label="Fechar">×</button>
+    <main class="dashboard-shell">
+      <header class="dashboard-header">
+        <div class="dashboard-header-start"><a class="dashboard-brand" href="index.html" aria-label="Vôlei Hub"><img src="assets/favicon.png" alt="Vôlei Hub" /></a><button id="logout-button" type="button">↩ Voltar ao login</button></div>
+        <div class="account-card">
+          <strong id="account-name">Carregando…</strong>
+          <span id="account-email"></span>
+          <div class="account-actions"><button id="theme-toggle" type="button" aria-pressed="true">☀</button></div>
         </div>
-        <label for="account-edit-name">Nome da conta</label>
-        <input id="account-edit-name" type="text" minlength="2" maxlength="50" required />
-        <label for="account-edit-email">E-mail</label>
-        <input id="account-edit-email" type="email" required />
-        <p id="account-message" class="auth-message" role="status"></p>
-        <button class="save-account-button" type="submit">Salvar alterações</button>
-      </form>
-    </dialog>
+      </header>
+      <section class="dashboard-main">
+        <section class="dashboard-welcome">
+          <div class="welcome-copy"><p>Bem-vindo ao</p><h1>Vôlei <span>Hub</span></h1><p>Organize campeonatos de forma simples e eficiente.</p><strong class="welcome-note">Escolha uma ação rápida abaixo para começar.</strong></div>
+          <div class="volleyball-visual" aria-hidden="true"><i></i><i></i><i></i></div>
+        </section>
+        <section class="quick-actions-section" aria-labelledby="quick-actions-title">
+          <h2 id="quick-actions-title">Ações rápidas</h2>
+          <nav class="dashboard-actions">
+            <a href="tabela.htm" class="dashboard-action"><span class="action-icon" data-action-icon="tabela" aria-hidden="true"><img src="assets/tabela.png" alt="" /></span><strong>Tabela</strong><small>Crie e organize suas rodadas.</small></a>
+            <a href="GeradorTimes.html" class="dashboard-action"><span class="action-icon" data-action-icon="gerador-times" aria-hidden="true"><img src="assets/geradortime.png" alt="" /></span><strong>Gerador de Times</strong><small>Monte equipes equilibradas.</small></a>
+            <a href="jogo.html" class="dashboard-action"><span class="action-icon" data-action-icon="jogo-resultado" aria-hidden="true"><img src="assets/jogorodada.png" alt="" /></span><strong>Jogo por Resultado</strong><small>Informe o placar da partida.</small></a>
+            <a href="jogoajogo.html" class="dashboard-action"><span class="action-icon" data-action-icon="jogo-ponto" aria-hidden="true"><img src="assets/jogoponto.png" alt="" /></span><strong>Jogo Ponto a Ponto</strong><small>Acompanhe cada ponto do jogo.</small></a>
+            <a href="resultados.html" class="dashboard-action"><span class="action-icon" data-action-icon="resultados" aria-hidden="true"><img src="assets/resultados.png" alt="" /></span><strong>Resultados</strong><small>Veja classificações e estatísticas.</small></a>
+            <a href="config.html" class="dashboard-action"><span class="action-icon" data-action-icon="configuracoes" aria-hidden="true"><img src="assets/config.png" alt="" /></span><strong>Configurações</strong><small>Edite as informações da conta.</small></a>
+          </nav>
+        </section>
+        <details id="current-game-menu" class="current-game-menu dashboard-current-game" hidden><summary>Partida atual</summary><div id="current-game-info"></div></details>
+      </section>
+      <footer class="dashboard-footer"><span>© 2026 RST Code. Todos os direitos reservados.</span></footer>
+    </main>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-config.js"></script>
     <script src="theme.js"></script>

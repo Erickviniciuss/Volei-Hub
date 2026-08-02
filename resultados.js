@@ -6,6 +6,11 @@ let allResults = [];
 let visibleResults = 5;
 
 function escapeResult(value) { return String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#039;", '"': "&quot;" })[char]); }
+function resultPdfFileName(date = new Date()) {
+  const value = new Date(date);
+  const pad = (number) => String(number).padStart(2, "0");
+  return `Volei Hub - ${pad(value.getDate())}-${pad(value.getMonth() + 1)}-${value.getFullYear()} ${pad(value.getHours())}h${pad(value.getMinutes())}.pdf`;
+}
 function scoreFor(result, roundIndex, gameIndex) {
   const score = new Map(result.scores || []).get(`${roundIndex}-${gameIndex}`);
   return score && score[0] !== "" && score[1] !== "" ? `${score[0]} × ${score[1]}` : "—";
@@ -109,7 +114,7 @@ async function printResult(result) {
       if (round.bye) line(`Folga: ${round.bye}`, 9);
       y += 3;
     });
-    const file = new File([pdf.output("blob")], "resultado-volei-hub.pdf", { type: "application/pdf" });
+    const file = new File([pdf.output("blob")], resultPdfFileName(result.startedAt || result.finishedAt), { type: "application/pdf" });
     if (navigator.canShare?.({ files: [file] })) {
       try { await navigator.share({ title: "Resultado - Vôlei Hub", text: "Resultado da partida.", files: [file] }); return; }
       catch (error) { if (error.name === "AbortError") return; }
