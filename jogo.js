@@ -120,7 +120,7 @@ function buildExpandedSchedule(previousRound, previousTeams, nextTeams, futureRo
 function scoreKey(round, game) { return `${round}-${game}`; }
 function rankingStats(team) { return `<small class="ranking-stats"><span><b>Vit.</b>${team.wins}</span><span><b>Der.</b>${team.losses}</span><span><b>Jogos</b>${team.games}</span><span><b>Pontos</b>${team.points}</span><span><b>Saldo</b>${team.difference >= 0 ? "+" : ""}${team.difference}</span></small>`; }
 function saveQuickGame() {
-  const game = { status: "active", shareCode: currentShareCode, startedAt: gameStartedAt, schedule: quickSchedule, currentRound, confirmedGameCount, scores: [...scores.entries()], teams: currentTeams, playerCount: currentPlayerCount, players: currentPlayers };
+  const game = { status: "active", started: true, gameType: "result", shareCode: currentShareCode, startedAt: gameStartedAt, schedule: quickSchedule, currentRound, confirmedGameCount, scores: [...scores.entries()], teams: currentTeams, playerCount: currentPlayerCount, players: currentPlayers };
   window.quickGameStore.saveActive(game);
   window.quickGameStore.saveLiveGame(game).then(({ error }) => {
     const status = document.querySelector("#share-code-status");
@@ -360,10 +360,13 @@ quickPlayersToggle.addEventListener("click", () => {
   quickPlayersToggle.textContent = quickPlayersPanel.hidden ? "Cadastrar participantes" : "Ocultar participantes";
 });
 quickRoundCount.addEventListener("change", () => { quickRoundCount.value = normalizeQuickRounds(quickRoundCount.value, maxQuickRounds(Number(quickTeamCount.value)), quickUnlimited.checked); });
-document.querySelector("#quick-start").addEventListener("click", () => {
+document.querySelector("#quick-start").addEventListener("click", async () => {
   const teams = [...document.querySelectorAll(".quick-team-name")].map((input, index) => input.value.trim() || `Equipe ${index + 1}`);
   const rounds = normalizeQuickRounds(quickRoundCount.value, maxQuickRounds(teams.length), quickUnlimited.checked);
-  if (window.quickGameStore.getActive()?.status === "active") return;
+  const localActive = window.quickGameStore.getActive();
+  if (localActive?.status === "active" && localActive.started === true) { window.alert("Já existe um jogo em andamento. Encerre-o antes de iniciar outro."); return; }
+  const { data: cloudActive } = await window.quickGameStore.getOwnActiveLiveGame();
+  if (cloudActive?.status === "active" && cloudActive.started === true) { window.alert("Já existe um jogo em andamento nesta conta. Retorne ao jogo atual para continuar."); return; }
   quickRoundCount.value = rounds; currentTeams = teams; currentPlayerCount = Number(quickPlayerCount.value); currentPlayers = getQuickPlayers(); currentShareCode = generateShareCode(); gameStartedAt = new Date().toISOString(); quickSchedule = buildQuickSchedule(teams, rounds); currentRound = 0; confirmedGameCount = 0; scores = new Map(); saveQuickGame();
   quickSetup.hidden = true; quickGame.hidden = false; renderCurrentRound();
 });
@@ -417,7 +420,7 @@ document.querySelector("#new-game").addEventListener("click", () => { quickFinis
 makeQuickTeamInputs();
 
 const savedQuickGame = window.quickGameStore.getActive();
-if (savedQuickGame?.status === "active") {
+if (savedQuickGame?.status === "active" && savedQuickGame.started === true && savedQuickGame.gameType !== "points") {
   quickSchedule = savedQuickGame.schedule; currentRound = savedQuickGame.currentRound; confirmedGameCount = savedQuickGame.confirmedGameCount || 0; scores = new Map(savedQuickGame.scores || []); currentTeams = savedQuickGame.teams || []; currentPlayerCount = savedQuickGame.playerCount || 4; currentPlayers = savedQuickGame.players || currentTeams.map(() => []); currentShareCode = savedQuickGame.shareCode || generateShareCode(); gameStartedAt = savedQuickGame.startedAt || new Date().toISOString(); confirmedGameCount = Math.min(confirmedGameCount, Math.max(0, (quickSchedule[currentRound]?.matches.length || 1) - 1)); saveQuickGame();
   quickSetup.hidden = true; quickGame.hidden = false; renderCurrentRound();
 } else {

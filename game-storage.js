@@ -60,5 +60,12 @@ window.quickGameStore = {
     const { data, error } = await cloudSupabase.from("live_games").select("game_data,is_active,updated_at").eq("share_code", shareCode).maybeSingle();
     return { data: data ? { ...data.game_data, isActive: data.is_active, updatedAt: data.updated_at } : null, error };
   },
+  async getOwnActiveLiveGame() {
+    if (!cloudSupabase) return { data: null, error: new Error("Supabase não configurado") };
+    const { data: userData, error: userError } = await cloudSupabase.auth.getUser();
+    if (userError || !userData.user) return { data: null, error: userError || new Error("Sessão não encontrada") };
+    const { data, error } = await cloudSupabase.from("live_games").select("game_data,is_active,updated_at").eq("user_id", userData.user.id).eq("is_active", true).order("updated_at", { ascending: false }).limit(1).maybeSingle();
+    return { data: data ? { ...data.game_data, isActive: data.is_active, updatedAt: data.updated_at } : null, error };
+  },
   getCloudClient() { return cloudSupabase; },
 };

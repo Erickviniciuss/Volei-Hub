@@ -8,8 +8,51 @@
     <link rel="stylesheet" href="style.css" /><link rel="icon" type="image/png" href="assets/favicon.png" />
   </head>
   <body class="app-loading" data-theme="dark">
-    <main class="page-shell coming-soon-page"><div class="table-top-actions"><img class="table-logo" data-theme-logo src="assets/logo_escuro.png" alt="Vôlei Hub" /><button class="theme-button" type="button" data-theme-toggle aria-pressed="true">☀</button></div><p class="eyebrow">NOVIDADE</p><h1>Jogo Ponto a Ponto</h1><p class="hero-text">Esta opção chegará em breve.</p><a class="home-button" href="index.html"><span aria-hidden="true"><img src="assets/casa.png" alt="" /></span> Voltar para o menu principal</a></main>
+    <main class="page-shell point-game-shell">
+      <div class="table-top-actions"><img class="table-logo" data-theme-logo src="assets/logo_escuro.png" alt="Vôlei Hub" /><button class="theme-button" type="button" data-theme-toggle aria-pressed="true">☀</button></div>
+      <section class="hero"><p class="eyebrow">PARTIDA AO VIVO</p><h1>Jogo Ponto a Ponto</h1><p class="hero-text">Registre cada ponto da partida e acompanhe a classificação em tempo real.</p></section>
+
+      <section id="point-setup" class="setup-card">
+        <div class="settings-row"><p class="eyebrow">CONFIGURAÇÃO DO JOGO</p><button id="point-settings-toggle" class="settings-button" type="button" aria-expanded="false" aria-label="Abrir configurações">⚙</button></div>
+        <div id="point-settings-panel" class="settings-panel" hidden><label class="switch-label" for="point-unlimited"><input id="point-unlimited" type="checkbox" /><span><strong>Sem limite de rodadas</strong><small>Permite qualquer quantidade de rodadas, mesmo com repetição de confrontos.</small></span></label><label class="switch-label point-require-label" for="point-require-names"><input id="point-require-names" type="checkbox" /><span><strong>Permitir iniciar sem nomes</strong><small>Permite começar a partida mesmo sem cadastrar participantes nas equipes.</small></span></label></div>
+        <div class="field-row">
+          <div class="field-group"><label for="point-team-count">Quantidade de times</label><select id="point-team-count"><option value="3">3 times</option><option value="4">4 times</option><option value="5" selected>5 times</option><option value="6">6 times</option><option value="7">7 times</option><option value="8">8 times</option></select></div>
+          <div class="field-group compact-field"><label for="point-round-count">Rodadas do jogo</label><input id="point-round-count" type="number" min="1" value="20" /></div>
+          <div class="field-group compact-field"><label for="point-player-count">Pessoas por time</label><select id="point-player-count"><option value="3">3 pessoas</option><option value="4" selected>4 pessoas</option><option value="5">5 pessoas</option><option value="6">6 pessoas</option></select></div>
+          <div class="field-group compact-field"><label for="points-to-win">Pontos da partida</label><input id="points-to-win" type="number" min="1" value="15" /></div>
+        </div>
+        <div id="point-team-names" class="team-names"></div>
+        <div class="names-toggle-row"><p>Informe pelo menos um participante em cada equipe.</p></div>
+        <div id="point-players" class="players-panel point-players-panel"></div>
+        <p id="point-setup-message" class="auth-message" aria-live="polite"></p><button id="point-start" type="button">Iniciar jogo</button>
+      </section>
+
+      <section id="point-game" class="quick-game" hidden aria-live="polite">
+        <div class="quick-game-heading"><div><p class="eyebrow">EM ANDAMENTO</p><h2 id="point-round-title">Rodada 1</h2></div><div class="game-actions"><button id="point-show-rounds" class="secondary-button" type="button">Ver rodadas</button><button id="point-print-game" class="secondary-button" type="button">Enviar PDF</button><button id="point-adjust-game" class="secondary-button" type="button" aria-expanded="false">Ajustar jogo</button><button id="point-finish" class="danger-button game-finish-button" type="button">Encerrar jogo</button></div></div>
+        <div id="point-finish-confirm" class="finish-confirm-panel" hidden><strong>Encerrar o jogo agora?</strong><p>A partida será encerrada no ponto em que está e não poderá continuar.</p><div><button id="point-cancel-finish" class="secondary-button" type="button">Cancelar</button><button id="point-confirm-finish" class="danger-button" type="button">Encerrar jogo</button></div></div>
+        <p id="point-progress" class="quick-progress"></p><section id="point-current-match" class="point-current-match"></section><section class="live-ranking"><h3>Ranking atual</h3><div id="point-ranking" class="ranking-list"></div></section><section class="live-ranking"><h3>Top 10 jogadores</h3><div id="point-live-player-ranking" class="ranking-list"></div></section><section id="point-point-history" class="point-game-history" hidden></section><div class="share-game-code"><span>CÓDIGO DE ACOMPANHAMENTO</span><strong id="point-share-code-value">--</strong><button id="point-copy-share-code" class="secondary-button" type="button">Copiar código</button><small id="point-share-code-status"></small></div>
+        <section id="point-live-settings" class="live-settings" hidden>
+          <div class="settings-row"><p class="eyebrow">AJUSTAR PRÓXIMAS RODADAS</p></div>
+          <div class="field-row"><div class="field-group"><label for="point-live-team-count">Quantidade de times</label><select id="point-live-team-count"><option value="3">3 times</option><option value="4">4 times</option><option value="5">5 times</option><option value="6">6 times</option><option value="7">7 times</option><option value="8">8 times</option></select></div><div class="field-group compact-field"><label for="point-live-round-count">Rodadas totais</label><input id="point-live-round-count" type="number" min="1" /></div><div class="field-group compact-field"><label for="point-live-player-count">Pessoas por time</label><select id="point-live-player-count"><option value="3">3 pessoas</option><option value="4">4 pessoas</option><option value="5">5 pessoas</option><option value="6">6 pessoas</option></select></div></div>
+          <div id="point-live-team-names" class="team-names"></div>
+          <div class="names-toggle-row"><p>Edite os participantes das equipes.</p><button id="point-live-players-toggle" class="secondary-button" type="button" aria-expanded="false">Editar participantes</button></div>
+          <div id="point-live-players" class="players-panel" hidden></div>
+          <button id="point-apply-live-settings" type="button">Aplicar às próximas rodadas</button>
+        </section>
+      </section>
+      <section id="point-finished" class="quick-finished" hidden><p class="eyebrow">JOGO ENCERRADO</p><h2>Partida finalizada</h2><p id="point-finished-copy"></p><div id="point-finished-ranking" class="finished-ranking"></div><div id="point-player-ranking" class="finished-ranking"></div><button id="point-finished-history-toggle" class="secondary-button" type="button" aria-expanded="false">Ver histórico de movimentos</button><section id="point-finished-history" class="point-game-history" hidden></section><button id="point-new-game" type="button">Criar novo jogo</button></section>
+      <dialog id="point-scorer-dialog" class="account-dialog point-scorer-dialog">
+        <div class="point-scorer-dialog-content">
+          <div class="dialog-heading"><div><p class="eyebrow">REGISTRAR PONTO</p><h2 id="point-scorer-title">Quem marcou?</h2></div><button id="point-scorer-close" class="dialog-close" type="button" aria-label="Fechar">×</button></div>
+          <p class="point-scorer-help">Selecione quem marcou o ponto e continue.</p>
+          <div id="point-scorer-options" class="point-scorer-options"></div>
+          <button id="point-scorer-continue" type="button" disabled>Continuar</button>
+        </div>
+      </dialog>
+      <section id="point-overview" class="rounds-overview" hidden><div class="overview-heading"><div><p class="eyebrow">CALENDÁRIO</p><h2>Todas as rodadas</h2></div><div class="overview-actions"><button id="point-retro-edit-toggle" class="secondary-button" type="button">Ajustar jogos</button><button id="point-close-overview" class="dialog-close" type="button" aria-label="Fechar">×</button></div></div><div id="point-retro-auth-panel" class="retro-auth-panel" hidden><label for="point-retro-password">Senha da conta</label><div><input id="point-retro-password" type="password" autocomplete="current-password" placeholder="Informe sua senha" /><button id="point-unlock-retro-edit" type="button">Liberar ajustes</button></div><p id="point-retro-edit-message" class="score-message" role="alert"></p></div><button id="point-save-retro-scores" class="confirm-round" type="button" hidden>Salvar ajustes retroativos</button><div id="point-overview-rounds" class="rounds"></div></section>
+      <a class="home-button" href="index.html"><span aria-hidden="true"><img src="assets/casa.png" alt="" /></span> Menu principal</a>
+    </main>
     <footer class="site-footer">© 2026 RST Code. Todos os direitos reservados.</footer>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script><script src="theme.js"></script><script src="table-auth.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script><script src="theme.js"></script><script src="table-auth.js"></script><script src="game-storage.js?v=3"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script><script src="jogo-ponto.js?v=8"></script>
   </body>
 </html>

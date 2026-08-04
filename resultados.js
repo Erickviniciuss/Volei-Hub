@@ -1,6 +1,7 @@
 const resultsList = document.querySelector("#results-list");
 const resultSyncStatus = document.querySelector("#result-sync-status");
 const resultsDateFilter = document.querySelector("#results-date-filter");
+const resultsTypeFilter = document.querySelector("#results-type-filter");
 let displayedResults = [];
 let allResults = [];
 let visibleResults = 5;
@@ -11,9 +12,25 @@ function resultPdfFileName(date = new Date()) {
   const pad = (number) => String(number).padStart(2, "0");
   return `Volei Hub - ${pad(value.getDate())}-${pad(value.getMonth() + 1)}-${value.getFullYear()} ${pad(value.getHours())}h${pad(value.getMinutes())}.pdf`;
 }
+function resultGameType(result) { return result.gameType === "points" ? "points" : "result"; }
+function resultGameTypeLabel(result) { return resultGameType(result) === "points" ? "Jogo Ponto a Ponto" : "Jogo por Resultado"; }
+function pointPlayerRanking(result) {
+  if (Array.isArray(result.playerStandings)) return result.playerStandings;
+  const players = new Map();
+  (result.pointHistory || []).forEach(([, movements]) => (movements || []).forEach((movement) => {
+    if (!movement.player || movement.player === "Outros") return;
+    const key = `${movement.team}\u0000${movement.player}`;
+    const current = players.get(key) || { team: movement.team, name: movement.player, points: 0 };
+    current.points += 1; players.set(key, current);
+  }));
+  return [...players.values()].sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
+}
+function pointMovements(result, roundIndex, gameIndex) { return new Map(result.pointHistory || []).get(`${roundIndex}-${gameIndex}`) || []; }
+function movementText(movement) { const score = movement.side === "home" ? `${movement.homeScore} × ${movement.awayScore}` : `${movement.homeScore} × ${movement.awayScore}`; return `${movement.team}: ${movement.player} · ${score}${movement.time ? ` · ${movement.time}` : ""}`; }
 function scoreFor(result, roundIndex, gameIndex) {
   const score = new Map(result.scores || []).get(`${roundIndex}-${gameIndex}`);
-  return score && score[0] !== "" && score[1] !== "" ? `${score[0]} × ${score[1]}` : "—";
+  if (!score) return "—";
+  return Array.isArray(score) && score[0] !== "" && score[1] !== "" ? `${score[0]} × ${score[1]}` : !Array.isArray(score) ? `${score.home} × ${score.away}` : "—";
 }
 function resultVisualStats(result, team) {
   if (Number.isFinite(team.games) && Number.isFinite(team.losses)) return { games: team.games, losses: team.losses };
@@ -40,17 +57,20 @@ function localDate(value) {
 
 function renderResults() {
   const selectedDate = resultsDateFilter.value;
-  const results = selectedDate ? allResults.filter((result) => localDate(result.finishedAt) === selectedDate) : allResults;
+  const selectedType = resultsTypeFilter.value;
+  const results = allResults.filter((result) => (!selectedDate || localDate(result.finishedAt) === selectedDate) && (selectedType === "all" || resultGameType(result) === selectedType));
   displayedResults = results;
   if (!results.length) {
-    const message = selectedDate ? "Nenhum jogo encontrado nesta data." : "Os resultados aparecerão aqui quando uma partida for finalizada.";
+    const message = selectedDate || selectedType !== "all" ? "Nenhum jogo encontrado com os filtros selecionados." : "Os resultados aparecerão aqui quando uma partida for finalizada.";
     resultsList.innerHTML = `<section class="empty-results"><h2>Nenhum jogo encerrado</h2><p>${message}</p></section>`;
     return;
   }
   const visible = results.slice(0, visibleResults);
   resultsList.innerHTML = visible.map((result) => {
     const date = new Date(result.finishedAt).toLocaleString("pt-BR");
-    return `<article class="result-card"><div class="result-card-heading"><div><p class="eyebrow">${date}</p><h2>${escapeResult(result.reason)}</h2></div><div class="result-actions"><button class="print-result" type="button" data-id="${result.id}">Enviar PDF</button><button class="delete-result" type="button" data-id="${result.id}">Excluir</button></div></div><div class="result-ranking">${result.standings.map((team, index) => `<div><strong>${index + 1}º</strong><span class="result-team-name">${escapeResult(team.name)}</span>${resultStats(team, result)}</div>`).join("")}</div></article>`;
+    const topPlayer = resultGameType(result) === "points" ? pointPlayerRanking(result)[0] : null;
+    const playerHighlight = topPlayer ? `<p class="result-top-player">Maior pontuador: <strong>${escapeResult(topPlayer.name)}</strong> · ${escapeResult(topPlayer.team)} · ${topPlayer.points} pontos</p>` : resultGameType(result) === "points" ? "<p class=\"result-top-player\">Nenhum ponto individual foi registrado.</p>" : "";
+    return `<article class="result-card"><div class="result-card-heading"><div><p class="eyebrow">${date}</p><span class="result-game-type ${resultGameType(result)}">${resultGameTypeLabel(result)}</span><h2>${escapeResult(result.reason)}</h2></div><div class="result-actions"><button class="print-result" type="button" data-id="${result.id}">Enviar PDF</button><button class="delete-result" type="button" data-id="${result.id}">Excluir</button></div></div><div class="result-ranking">${result.standings.map((team, index) => `<div><strong>${index + 1}º</strong><span class="result-team-name">${escapeResult(team.name)}</span>${resultStats(team, result)}</div>`).join("")}</div>${playerHighlight}</article>`;
   }).join("") + (visible.length < results.length ? `<button id="show-more-results" class="show-more-results" type="button">Mostrar mais</button>` : "");
 }
 
@@ -59,11 +79,13 @@ async function printResult(result) {
   const rows = result.standings.map((team, index) => { const visual = resultVisualStats(result, team); return `<tr><td>${index + 1}º</td><td>${escapeResult(team.name)}</td><td>${visual.games}</td><td>${team.wins}</td><td>${visual.losses}</td><td>${team.points}</td><td>${team.difference >= 0 ? "+" : ""}${team.difference}</td></tr>`; }).join("");
   const teamNames = result.teams?.length ? result.teams : result.standings.map((team) => team.name);
   const totalPlayers = result.playerCount || Math.max(4, ...(result.players || []).map((players) => players.length));
+  const topPlayers = resultGameType(result) === "points" ? pointPlayerRanking(result).slice(0, 10) : [];
   const participants = teamNames.map((team, teamIndex) => {
     const names = Array.from({ length: totalPlayers }, (_, playerIndex) => result.players?.[teamIndex]?.[playerIndex] || "Vazio");
     return `<section class="team"><h3>${escapeResult(team)}</h3><p>${names.map(escapeResult).join(" · ")}</p></section>`;
   }).join("");
-  const rounds = result.schedule.map((round, roundIndex) => `<section class="round"><h2>Rodada ${roundIndex + 1}</h2>${round.matches.map(([home, away], gameIndex) => `<div class="match"><span>${escapeResult(home)}</span><strong>${scoreFor(result, roundIndex, gameIndex)}</strong><span>${escapeResult(away)}</span></div>`).join("")}${round.bye ? `<p>Folga: <b>${escapeResult(round.bye)}</b></p>` : ""}</section>`).join("");
+  const rounds = result.schedule.map((round, roundIndex) => `<section class="round"><h2>Rodada ${roundIndex + 1}</h2>${round.matches.map(([home, away], gameIndex) => { const movements = pointMovements(result, roundIndex, gameIndex); return `<div class="match"><span>${escapeResult(home)}</span><strong>${scoreFor(result, roundIndex, gameIndex)}</strong><span>${escapeResult(away)}</span></div>${movements.length ? `<div class="print-movements"><b>Histórico de movimentos</b>${movements.map((movement, index) => `<p>${index + 1}º lance · ${escapeResult(movementText(movement))}</p>`).join("")}</div>` : ""}`; }).join("")}${round.bye ? `<p>Folga: <b>${escapeResult(round.bye)}</b></p>` : ""}</section>`).join("");
+  const topPlayersHtml = topPlayers.length ? `<h1>Top 10 jogadores</h1><ol>${topPlayers.map((player) => `<li>${escapeResult(player.name)} · ${escapeResult(player.team)} · ${player.points} pontos</li>`).join("")}</ol>` : "";
   const Pdf = window.jspdf?.jsPDF;
   if (Pdf) {
     const pdf = new Pdf({ unit: "mm", format: "a4" }); let y = 18;
@@ -72,6 +94,23 @@ async function printResult(result) {
       const lines = pdf.splitTextToSize(text, 175);
       if (y + lines.length * 6 > 280) { pdf.addPage(); y = 18; }
       pdf.text(lines, 18, y); y += lines.length * 6;
+    };
+    const compactMovements = (movements) => {
+      const writeCompact = (text) => {
+        pdf.setFont("helvetica", "normal"); pdf.setFontSize(6);
+        const lines = pdf.splitTextToSize(text, 175);
+        if (y + lines.length * 2.6 > 280) { pdf.addPage(); y = 18; }
+        pdf.text(lines, 18, y); y += lines.length * 2.6;
+      };
+      pdf.setFont("helvetica", "normal"); pdf.setFontSize(6);
+      let row = [];
+      movements.forEach((movement, index) => {
+        const entry = `${index + 1}º ${movement.team}: ${movement.player}${movement.time ? ` ${movement.time}` : ""} ${movement.homeScore} × ${movement.awayScore}`;
+        const candidate = [...row, entry].join(" | ");
+        if (row.length && (row.length === 6 || pdf.getTextWidth(candidate) > 175)) { writeCompact(row.join(" | ")); row = [entry]; }
+        else row.push(entry);
+      });
+      if (row.length) writeCompact(row.join(" | "));
     };
     line("VÔLEI HUB", 12, true); line("Resultado de partida", 20, true); line(result.reason); y += 3;
     line("Classificação final", 15, true);
@@ -102,6 +141,10 @@ async function printResult(result) {
       drawRankingRow([`${index + 1}º`, team.name, visual.games, team.wins, visual.losses, team.points, `${team.difference >= 0 ? "+" : ""}${team.difference}`]);
     });
     pdf.setTextColor(30, 41, 59);
+    if (topPlayers.length) {
+      y += 12; line("Top 10 jogadores", 15, true);
+      topPlayers.forEach((player, index) => line(`${index + 1}º ${player.name} · ${player.team} · ${player.points} pontos`));
+    }
     y += 12; line("Participantes por equipe", 15, true);
     teamNames.forEach((team, teamIndex) => {
       const names = Array.from({ length: totalPlayers }, (_, playerIndex) => result.players?.[teamIndex]?.[playerIndex] || "Vazio");
@@ -110,7 +153,12 @@ async function printResult(result) {
     y += 3; line("Jogos por rodada", 15, true);
     result.schedule.forEach((round, roundIndex) => {
       line(`Rodada ${roundIndex + 1}`, 13, true);
-      round.matches.forEach(([home, away], gameIndex) => line(`${home}    ${scoreFor(result, roundIndex, gameIndex)}    ${away}`));
+      round.matches.forEach(([home, away], gameIndex) => {
+        line(`${home}    ${scoreFor(result, roundIndex, gameIndex)}    ${away}`);
+        const movements = pointMovements(result, roundIndex, gameIndex);
+        compactMovements(movements);
+        if (movements.length) y += 4;
+      });
       if (round.bye) line(`Folga: ${round.bye}`, 9);
       y += 3;
     });
@@ -158,6 +206,7 @@ async function loadResults() {
 }
 
 resultsDateFilter.addEventListener("change", () => { visibleResults = 5; renderResults(); });
-document.querySelector("#clear-results-filter").addEventListener("click", () => { resultsDateFilter.value = ""; visibleResults = 5; renderResults(); });
+resultsTypeFilter.addEventListener("change", () => { visibleResults = 5; renderResults(); });
+document.querySelector("#clear-results-filter").addEventListener("click", () => { resultsDateFilter.value = ""; resultsTypeFilter.value = "all"; visibleResults = 5; renderResults(); });
 
 loadResults();

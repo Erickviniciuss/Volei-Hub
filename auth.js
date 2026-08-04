@@ -6,6 +6,7 @@ const authMessage = document.querySelector("#auth-message");
 const spectatorToggle = document.querySelector("#spectator-toggle");
 const spectatorAccess = document.querySelector("#spectator-access");
 const spectatorCode = document.querySelector("#spectator-code");
+const confirmationCompleted = new URLSearchParams(window.location.search).get("confirmado") === "1";
 
 const config = window.SUPABASE_CONFIG;
 const hasSupabaseKey = config?.anonKey && !config.anonKey.startsWith("COLE_A_CHAVE");
@@ -34,6 +35,12 @@ function showForm(form) {
   loginTab.setAttribute("aria-selected", String(isLogin));
   signupTab.setAttribute("aria-selected", String(!isLogin));
   setMessage("");
+}
+
+function showConfirmationSuccess() {
+  if (!confirmationCompleted) return;
+  showForm("login");
+  setMessage("Login Confirmado! Agora você já pode entrar na sua conta.", "is-success");
 }
 
 function openTable() {
@@ -90,7 +97,10 @@ signupForm.addEventListener("submit", async (event) => {
   const { data, error } = await supabaseClient.auth.signUp({
     email: document.querySelector("#signup-email").value.trim(),
     password,
-    options: { data: { display_name: document.querySelector("#signup-name").value.trim() } },
+    options: {
+      data: { display_name: document.querySelector("#signup-name").value.trim() },
+      emailRedirectTo: new URL("login.html?confirmado=1", window.location.href).href,
+    },
   });
   button.disabled = false;
   if (error) {
@@ -103,8 +113,10 @@ signupForm.addEventListener("submit", async (event) => {
 
 if (supabaseClient) {
   supabaseClient.auth.getSession().then(({ data }) => {
-    if (data.session) openTable();
+    if (data.session && !confirmationCompleted) openTable();
   });
 } else {
   setMessage("Acesse sua conta assim que a chave pública do Supabase for adicionada.");
 }
+
+showConfirmationSuccess();

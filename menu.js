@@ -20,18 +20,27 @@ function applyTheme(theme) {
 function returnToLogin() { window.location.replace("login.html"); }
 function waitForSession(milliseconds) { return new Promise((resolve) => window.setTimeout(resolve, milliseconds)); }
 
-function renderCurrentGame() {
-  const game = window.quickGameStore.getActive();
+function renderCurrentGame(game = window.quickGameStore.getActive()) {
   const menu = document.querySelector("#current-game-menu");
-  if (!game || game.status !== "active") return;
+  if (!game || game.status !== "active" || game.started !== true) return;
   menu.hidden = false;
-  document.querySelector("#current-game-info").innerHTML = `<strong>Rodada ${Math.min(game.currentRound + 1, game.schedule.length)} de ${game.schedule.length}</strong><a href="jogo.html">Continuar jogo</a>`;
+  const href = game.gameType === "points" ? "jogoajogo.html" : "jogo.html";
+  const label = game.gameType === "points" ? "Jogo Ponto a Ponto" : "Jogo por Resultado";
+  document.querySelector("#current-game-info").innerHTML = `<strong>${label} · Rodada ${Math.min(game.currentRound + 1, game.schedule.length)} de ${game.schedule.length}</strong><a href="${href}">Continuar jogo</a>`;
+  document.querySelectorAll("[data-game-mode]").forEach((action) => {
+    const unavailable = action.dataset.gameMode !== game.gameType;
+    action.classList.toggle("is-disabled", unavailable);
+    action.setAttribute("aria-disabled", String(unavailable));
+    if (unavailable) action.title = "Há outro jogo em andamento.";
+    else action.removeAttribute("title");
+  });
 }
 
 function updateAccount(user) {
   currentUser = user;
   nameNode.textContent = user.user_metadata?.display_name || user.email;
   emailNode.textContent = user.email;
+  window.quickGameStore.getOwnActiveLiveGame().then(({ data }) => { if (data?.status === "active" && data.started === true) renderCurrentGame(data); }).catch(() => {});
 }
 
 if (!menuSupabase) returnToLogin();
@@ -63,3 +72,4 @@ else {
 renderCurrentGame();
 
 logoutButton.addEventListener("click", async () => { if (menuSupabase) await menuSupabase.auth.signOut({ scope: "local" }); });
+document.querySelectorAll("[data-game-mode]").forEach((action) => action.addEventListener("click", (event) => { if (action.getAttribute("aria-disabled") === "true") event.preventDefault(); }));

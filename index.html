@@ -30,10 +30,10 @@
           <nav class="dashboard-actions">
             <a href="tabela.htm" class="dashboard-action"><span class="action-icon" data-action-icon="tabela" aria-hidden="true"><img src="assets/tabela.png" alt="" /></span><strong>Tabela</strong><small>Crie e organize suas rodadas.</small></a>
             <a href="GeradorTimes.html" class="dashboard-action"><span class="action-icon" data-action-icon="gerador-times" aria-hidden="true"><img src="assets/geradortime.png" alt="" /></span><strong>Gerador de Times</strong><small>Monte equipes equilibradas.</small></a>
-            <a href="jogo.html" class="dashboard-action"><span class="action-icon" data-action-icon="jogo-resultado" aria-hidden="true"><img src="assets/jogorodada.png" alt="" /></span><strong>Jogo por Resultado</strong><small>Informe o placar da partida.</small></a>
-            <a href="jogoajogo.html" class="dashboard-action"><span class="action-icon" data-action-icon="jogo-ponto" aria-hidden="true"><img src="assets/jogoponto.png" alt="" /></span><strong>Jogo Ponto a Ponto</strong><small>Acompanhe cada ponto do jogo.</small></a>
-            <a href="resultados.html" class="dashboard-action"><span class="action-icon" data-action-icon="resultados" aria-hidden="true"><img src="assets/resultados.png" alt="" /></span><strong>Resultados</strong><small>Veja classificações e estatísticas.</small></a>
-            <a href="config.html" class="dashboard-action"><span class="action-icon" data-action-icon="configuracoes" aria-hidden="true"><img src="assets/config.png" alt="" /></span><strong>Configurações</strong><small>Edite as informações da conta.</small></a>
+            <a href="jogo.html" class="dashboard-action" data-game-mode="result"><span class="action-icon" data-action-icon="jogo-resultado" aria-hidden="true"><img src="assets/jogorodada.png" alt="" /></span><strong>Jogo por Resultado</strong><small>Nesse modo é necessario informar apanes o placar final da partida.</small></a>
+            <a href="jogoajogo.html" class="dashboard-action" data-game-mode="points"><span class="action-icon" data-action-icon="jogo-ponto" aria-hidden="true"><img src="assets/jogoponto.png" alt="" /></span><strong>Jogo Ponto a Ponto</strong><small>Nesse modo é necessario informar ponto a ponto do jogo.</small></a>
+            <a href="resultados.html" class="dashboard-action"><span class="action-icon" data-action-icon="resultados" aria-hidden="true"><img src="assets/resultados.png" alt="" /></span><strong>Resultados</strong><small>Veja classificações e resultados anteriores.</small></a>
+            <a href="config.html" class="dashboard-action"><span class="action-icon" data-action-icon="configuracoes" aria-hidden="true"><img src="assets/config.png" alt="" /></span><strong>Configurações</strong><small>Edite as informações do seu painel.</small></a>
           </nav>
         </section>
         <details id="current-game-menu" class="current-game-menu dashboard-current-game" hidden><summary>Partida atual</summary><div id="current-game-info"></div></details>
@@ -43,7 +43,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-config.js"></script>
     <script src="theme.js"></script>
-    <script src="game-storage.js"></script>
-    <script src="menu.js?v=5"></script>
+    <script src="game-storage.js?v=3"></script>
+    <script src="menu.js?v=8"></script>
   </body>
 </html>
