@@ -51,28 +51,40 @@ function uniquePointMatchdays(teams) {
   }
   return days;
 }
-function buildPointSchedule(teams, rounds, initialBye = null) {
+function pointMatchId(home, away) { return [home, away].sort().join("|"); }
+function pointByeCounts(teams, rounds = []) { const counts = new Map(teams.map((team) => [team, 0])); rounds.forEach((round) => { if (round.bye && counts.has(round.bye)) counts.set(round.bye, counts.get(round.bye) + 1); }); return counts; }
+function pointPairCounts(rounds = []) { const counts = new Map(); rounds.forEach((round) => round.matches.forEach(([home, away]) => { const key = pointMatchId(home, away); counts.set(key, (counts.get(key) || 0) + 1); })); return counts; }
+function buildPointSchedule(teams, rounds, initialBye = null, previousRounds = []) {
   const base = uniquePointMatchdays(teams); let previousBye = initialBye;
-  return Array.from({ length: rounds }, (_, index) => {
-    const day = base[index % base.length]; const matches = day.matches.map((match) => [...match]);
+  const byeCounts = pointByeCounts(teams, previousRounds); const pairCounts = pointPairCounts(previousRounds);
+  return Array.from({ length: rounds }, () => {
+    let candidates = base.map((day, baseIndex) => ({ day, baseIndex }));
+    if (teams.length % 2 !== 0) { const lowest = Math.min(...[...byeCounts.values()]); candidates = candidates.filter(({ day }) => byeCounts.get(day.bye) === lowest); }
+    candidates.sort((a, b) => a.day.matches.reduce((total, [home, away]) => total + (pairCounts.get(pointMatchId(home, away)) || 0), 0) - b.day.matches.reduce((total, [home, away]) => total + (pairCounts.get(pointMatchId(home, away)) || 0), 0) || a.baseIndex - b.baseIndex);
+    const day = candidates[0].day; const matches = day.matches.map((match) => [...match]);
     const opening = matches.findIndex(([home, away]) => home === previousBye || away === previousBye);
     if (opening > 0) matches.unshift(matches.splice(opening, 1)[0]);
+    if (day.bye) byeCounts.set(day.bye, byeCounts.get(day.bye) + 1);
+    matches.forEach(([home, away]) => { const key = pointMatchId(home, away); pairCounts.set(key, (pairCounts.get(key) || 0) + 1); });
     previousBye = day.bye;
     return { ...day, matches };
   });
 }
-function buildPointExpandedSchedule(previousRound, previousTeams, nextTeams, futureRounds) {
+function buildPointExpandedSchedule(previousRound, previousTeams, nextTeams, futureRounds, previousRounds = []) {
   if (!futureRounds) return [];
   const newTeam = nextTeams.slice(previousTeams.length)[0];
-  if (!newTeam || !previousRound?.matches?.length) return buildPointSchedule(nextTeams, futureRounds, previousRound?.bye || null);
+  if (!newTeam || !previousRound?.matches?.length) return buildPointSchedule(nextTeams, futureRounds, previousRound?.bye || null, previousRounds);
   const lastMatch = previousRound.matches.at(-1);
-  const bye = nextTeams.length % 2 !== 0 ? lastMatch?.[1] || lastMatch?.[0] || null : null;
+  const counts = pointByeCounts(nextTeams, previousRounds);
+  const lowest = Math.min(...[...counts.entries()].filter(([team]) => team !== newTeam).map(([, count]) => count));
+  const preferred = [lastMatch?.[1], lastMatch?.[0]].filter((team) => team && team !== newTeam && counts.get(team) === lowest);
+  const bye = nextTeams.length % 2 !== 0 ? preferred[0] || nextTeams.find((team) => team !== newTeam && counts.get(team) === lowest) || null : null;
   const previousOrder = [...previousRound.matches.flat(), ...(previousRound.bye ? [previousRound.bye] : [])];
   const opponent = previousOrder.find((team) => team !== bye && team !== newTeam) || nextTeams.find((team) => team !== bye && team !== newTeam);
   const remaining = nextTeams.filter((team) => team !== newTeam && team !== opponent && team !== bye);
   const matches = [[newTeam, opponent]];
   for (let index = 0; index < remaining.length; index += 2) if (remaining[index] && remaining[index + 1]) matches.push([remaining[index], remaining[index + 1]]);
-  return [{ matches, bye }, ...buildPointSchedule(nextTeams, futureRounds - 1, bye)];
+  return [{ matches, bye }, ...buildPointSchedule(nextTeams, futureRounds - 1, bye, [...previousRounds, { matches, bye }])];
 }
 
 function makePointInputs() {
@@ -99,7 +111,7 @@ function getPointStandings() {
   const standings = [...names].map((name) => ({ name, games: 0, wins: 0, losses: 0, points: 0, conceded: 0, difference: 0 }));
   const byName = new Map(standings.map((team) => [team.name, team]));
   pointScores.forEach((score, key) => {
-    if (!score.finished) return;
+    if (!score.finished || !score.confirmed) return;
     const [round, match] = key.split("-").map(Number);
     const [home, away] = pointSchedule[round].matches[match];
     const h = byName.get(home); const a = byName.get(away);
@@ -138,7 +150,7 @@ function renderPointMatch() {
   }
   const [home, away] = round.matches[pointMatch];
   const key = pointKey(pointRound, pointMatch);
-  const score = pointScores.get(key) || { home: 0, away: 0, finished: false };
+  const score = pointScores.get(key) || { home: 0, away: 0, finished: false, confirmed: false };
   document.querySelector("#point-round-title").textContent = `Rodada ${pointRound + 1}`;
   document.querySelector("#point-progress").textContent = `${pointRound + 1} de ${pointSchedule.length} rodadas · primeiro time a ${pointsToWin.value} pontos`;
   document.querySelector("#point-share-code-value").textContent = pointShareCode || "--";
@@ -149,7 +161,7 @@ function renderPointMatch() {
 }
 function registerPoint(player) {
   const key = pointKey(pointRound, pointMatch);
-  const score = pointScores.get(key) || { home: 0, away: 0, finished: false };
+  const score = pointScores.get(key) || { home: 0, away: 0, finished: false, confirmed: false };
   const [home] = pointSchedule[pointRound].matches[pointMatch];
   const side = selectedPointTeam === home ? "home" : "away";
   score[side] += 1;
@@ -160,7 +172,9 @@ function registerPoint(player) {
 }
 function advancePointMatch() {
   const round = pointSchedule[pointRound];
-  if (!round || !pointScores.get(pointKey(pointRound, pointMatch))?.finished) return;
+  const score = pointScores.get(pointKey(pointRound, pointMatch));
+  if (!round || !score?.finished) return;
+  score.confirmed = true;
   if (pointMatch < round.matches.length - 1) pointMatch += 1; else { pointRound += 1; pointMatch = 0; }
   renderPointMatch(); savePointGame();
 }
@@ -205,7 +219,7 @@ function savePointRetroScores() {
   const invalid = [...pairs.values()].some((score) => score.home === "" || score.away === "" || Number(score.home) < 0 || Number(score.away) < 0 || Number(score.home) === Number(score.away));
   const message = document.querySelector("#point-retro-edit-message");
   if (invalid) { message.textContent = "Informe placares diferentes e válidos para todos os jogos ajustados."; return; }
-  pairs.forEach((score, key) => { pointScores.set(key, { home: Number(score.home), away: Number(score.away), finished: true }); pointHistory.delete(key); });
+  pairs.forEach((score, key) => { pointScores.set(key, { home: Number(score.home), away: Number(score.away), finished: true, confirmed: true }); pointHistory.delete(key); });
   pointRetroEditingUnlocked = false;
   document.querySelector("#point-save-retro-scores").hidden = true;
   document.querySelector("#point-retro-edit-toggle").textContent = "Ajustar jogos";
@@ -256,7 +270,7 @@ function applyLivePointSettings() {
     const previousRound = pointSchedule[pointRound];
     const previousTeams = pointTeams;
     pointTeams = liveTeams;
-    pointSchedule = [...preserved, ...buildPointExpandedSchedule(previousRound, previousTeams, pointTeams, futureRounds)];
+    pointSchedule = [...preserved, ...buildPointExpandedSchedule(previousRound, previousTeams, pointTeams, futureRounds, preserved)];
   }
   document.querySelector("#point-live-settings").hidden = true;
   document.querySelector("#point-adjust-game").setAttribute("aria-expanded", "false");
@@ -434,7 +448,7 @@ function restorePointGame(game) {
   pointShareCode = game.shareCode || generatePointShareCode();
   pointStartedAt = game.startedAt || new Date().toISOString();
   pointRequireNames.checked = Boolean(game.allowNoNames);
-  pointScores.clear(); (game.scores || []).forEach(([key, score]) => pointScores.set(key, score));
+  pointScores.clear(); (game.scores || []).forEach(([key, score]) => { const [roundIndex, matchIndex] = key.split("-").map(Number); if (score.finished && score.confirmed === undefined) score.confirmed = roundIndex < pointRound || (roundIndex === pointRound && matchIndex < pointMatch); pointScores.set(key, score); });
   pointHistory.clear(); (game.pointHistory || []).forEach(([key, history]) => pointHistory.set(key, history));
   document.querySelector("#point-setup").hidden = true;
   document.querySelector("#point-game").hidden = false;

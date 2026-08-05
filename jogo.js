@@ -84,26 +84,36 @@ function uniqueMatchdays(teams) {
   return matchdays;
 }
 
-function buildQuickSchedule(teams, rounds, initialBye = null) {
+function matchId(home, away) { return [home, away].sort().join("|"); }
+function byeCountsFor(teams, rounds = []) { const counts = new Map(teams.map((team) => [team, 0])); rounds.forEach((round) => { if (round.bye && counts.has(round.bye)) counts.set(round.bye, counts.get(round.bye) + 1); }); return counts; }
+function pairCountsFor(rounds = []) { const counts = new Map(); rounds.forEach((round) => round.matches.forEach(([home, away]) => { const key = matchId(home, away); counts.set(key, (counts.get(key) || 0) + 1); })); return counts; }
+function buildQuickSchedule(teams, rounds, initialBye = null, previousRounds = []) {
   const base = uniqueMatchdays(teams); let previousBye = initialBye;
+  const byeCounts = byeCountsFor(teams, previousRounds); const pairCounts = pairCountsFor(previousRounds);
   return Array.from({ length: rounds }, (_, index) => {
-    const cycle = Math.floor(index / base.length); const day = base[index % base.length];
-    // Após completar o ciclo, as rodadas iniciais são repetidas na mesma ordem.
-    const matches = day.matches.map(([home, away]) => [home, away]);
+    let candidates = base.map((day, baseIndex) => ({ day, baseIndex }));
+    if (teams.length % 2 !== 0) { const lowest = Math.min(...[...byeCounts.values()]); candidates = candidates.filter(({ day }) => byeCounts.get(day.bye) === lowest); }
+    candidates.sort((a, b) => a.day.matches.reduce((total, [home, away]) => total + (pairCounts.get(matchId(home, away)) || 0), 0) - b.day.matches.reduce((total, [home, away]) => total + (pairCounts.get(matchId(home, away)) || 0), 0) || a.baseIndex - b.baseIndex);
+    const day = candidates[0].day; const matches = day.matches.map(([home, away]) => [home, away]);
     const opening = matches.findIndex(([home, away]) => home === previousBye || away === previousBye);
     if (opening > 0) matches.unshift(matches.splice(opening, 1)[0]);
+    if (day.bye) byeCounts.set(day.bye, byeCounts.get(day.bye) + 1);
+    matches.forEach(([home, away]) => { const key = matchId(home, away); pairCounts.set(key, (pairCounts.get(key) || 0) + 1); });
     previousBye = day.bye;
-    return { ...day, matches, phase: cycle };
+    return { ...day, matches, phase: Math.floor(index / base.length) };
   });
 }
 
-function buildExpandedSchedule(previousRound, previousTeams, nextTeams, futureRounds) {
+function buildExpandedSchedule(previousRound, previousTeams, nextTeams, futureRounds, previousRounds = []) {
   if (!futureRounds) return [];
   const newTeam = nextTeams.slice(previousTeams.length)[0];
-  if (!newTeam || !previousRound?.matches?.length) return buildQuickSchedule(nextTeams, futureRounds, previousRound?.bye || null);
+  if (!newTeam || !previousRound?.matches?.length) return buildQuickSchedule(nextTeams, futureRounds, previousRound?.bye || null, previousRounds);
 
   const lastMatch = previousRound.matches.at(-1);
-  const bye = nextTeams.length % 2 !== 0 ? lastMatch?.[1] || lastMatch?.[0] || null : null;
+  const counts = byeCountsFor(nextTeams, previousRounds);
+  const lowest = Math.min(...[...counts.entries()].filter(([team]) => team !== newTeam).map(([, count]) => count));
+  const preferred = [lastMatch?.[1], lastMatch?.[0]].filter((team) => team && team !== newTeam && counts.get(team) === lowest);
+  const bye = nextTeams.length % 2 !== 0 ? preferred[0] || nextTeams.find((team) => team !== newTeam && counts.get(team) === lowest) || null : null;
   const previousOrder = [...previousRound.matches.flat(), ...(previousRound.bye ? [previousRound.bye] : [])];
   const opponent = previousOrder.find((team) => team !== bye && team !== newTeam) || nextTeams.find((team) => team !== bye && team !== newTeam);
   const remaining = nextTeams.filter((team) => team !== newTeam && team !== opponent && team !== bye);
@@ -114,7 +124,7 @@ function buildExpandedSchedule(previousRound, previousTeams, nextTeams, futureRo
 
   // A equipe adicionada abre a próxima rodada; em totais ímpares, a folga
   // fica com uma das duas equipes que encerrou a rodada anterior.
-  return [{ matches, bye, phase: 0 }, ...buildQuickSchedule(nextTeams, futureRounds - 1, bye)];
+  return [{ matches, bye, phase: 0 }, ...buildQuickSchedule(nextTeams, futureRounds - 1, bye, [...previousRounds, { matches, bye }])];
 }
 
 function scoreKey(round, game) { return `${round}-${game}`; }
@@ -247,7 +257,7 @@ function applyLiveSettings() {
     const previousTeams = currentTeams;
     currentTeams = liveTeams;
     // Somente a alteração da quantidade de equipes refaz as próximas rodadas.
-    quickSchedule = [...preserved, ...buildExpandedSchedule(activeRound, previousTeams, currentTeams, futureRounds)];
+    quickSchedule = [...preserved, ...buildExpandedSchedule(activeRound, previousTeams, currentTeams, futureRounds, preserved)];
   }
   document.querySelector("#live-settings").hidden = true;
   document.querySelector("#adjust-game-toggle").setAttribute("aria-expanded", "false");
