@@ -14,6 +14,10 @@
     <main class="page-shell viewer-shell">
       <div class="table-top-actions"><img class="table-logo" data-theme-logo src="assets/logo_escuro.png" alt="Vôlei Hub" /><button class="theme-button" type="button" data-theme-toggle aria-pressed="true">☀</button></div>
       <section class="hero"><p class="eyebrow">ACOMPANHAMENTO AO VIVO</p><h1>Jogo em andamento</h1><p class="hero-text">Veja as rodadas e o ranking atual. Esta página é somente para visualização.</p></section>
+      <section class="spectator-access viewer-access">
+        <label for="viewer-game-code">Código do jogo</label>
+        <div class="viewer-code-entry"><input id="viewer-game-code" type="text" maxlength="20" placeholder="Ex.: VH-8K2M4P" autocomplete="off" /><button id="viewer-enter-code" type="button">Acompanhar jogo</button></div>
+      </section>
       <p id="viewer-code" class="viewer-code"></p>
       <p id="viewer-status" class="result-sync-status" aria-live="polite">Carregando jogo…</p>
       <section id="viewer-content" hidden>
@@ -28,6 +32,6 @@
     <script src="supabase-config.js?v=2"></script>
     <script src="theme.js?v=2"></script>
     <script src="game-storage.js?v=3"></script>
-    <script src="acompanhar.js?v=4"></script>
+    <script src="acompanhar.js?v=5"></script>
   </body>
 </html>

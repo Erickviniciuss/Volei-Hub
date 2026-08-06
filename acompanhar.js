@@ -2,6 +2,8 @@ const viewerStatus = document.querySelector("#viewer-status");
 const viewerContent = document.querySelector("#viewer-content");
 const viewerCode = document.querySelector("#viewer-code");
 const liveCode = new URLSearchParams(window.location.search).get("codigo")?.trim().toUpperCase();
+const viewerCodeInput = document.querySelector("#viewer-game-code");
+const viewerEnterCode = document.querySelector("#viewer-enter-code");
 let viewerGame = null;
 let selectedViewerHistory = "";
 
@@ -85,8 +87,19 @@ async function loadViewerGame() {
   renderViewer(data);
 }
 
+function openViewerFromCode() {
+  const code = viewerCodeInput.value.trim().toUpperCase();
+  if (!code) { viewerStatus.textContent = "Informe o código do jogo para acompanhar."; viewerStatus.classList.add("is-error"); viewerCodeInput.focus(); return; }
+  window.location.assign(`acompanhar.html?codigo=${encodeURIComponent(code)}`);
+}
+
+viewerCodeInput.value = liveCode || "";
+viewerEnterCode.addEventListener("click", openViewerFromCode);
+viewerCodeInput.addEventListener("keydown", (event) => { if (event.key === "Enter") openViewerFromCode(); });
+
 const viewerClient = window.quickGameStore.getCloudClient();
 if (!viewerClient) { viewerStatus.textContent = "O Supabase não está configurado para o acompanhamento ao vivo."; viewerStatus.classList.add("is-error"); }
+else if (!liveCode) { viewerStatus.textContent = "Informe o código do jogo acima para acompanhar."; }
 else {
   loadViewerGame();
   viewerClient.channel(`live-game-${liveCode}`).on("postgres_changes", { event: "*", schema: "public", table: "live_games", filter: `share_code=eq.${liveCode}` }, (payload) => {

@@ -21,7 +21,7 @@
 
       <section class="setup-card" aria-label="Configuração do sorteio">
         <div class="field-row">
-          <div class="field-group compact-field"><label for="people-count">Quantidade de pessoas</label><input id="people-count" type="number" min="1" value="10" /></div>
+          <input id="people-count" type="hidden" value="1" />
           <div class="field-group compact-field"><label for="people-per-team">Pessoas por time</label><input id="people-per-team" type="number" min="1" value="4" /></div>
           <div class="field-group compact-field"><label for="team-total">Quantidade de times</label><input id="team-total" type="number" min="1" value="3" /></div>
         </div>
@@ -30,8 +30,12 @@
           <label class="switch-label" for="seed-enabled"><input id="seed-enabled" type="checkbox" /><span><strong>Usar cabeça de chave</strong><small>Os participantes marcados serão distribuídos primeiro entre os times.</small></span></label>
           <div id="seed-count-field" class="field-group compact-field" hidden><label for="seeds-per-team">Cabeças de chave por time</label><select id="seeds-per-team"><option value="1" selected>1 por time</option><option value="2">2 por time</option><option value="3">3 por time</option></select></div>
         </div>
-        <div class="names-toggle-row"><p>Informe os nomes dos participantes e, se desejar, marque os cabeças de chave.</p></div>
+        <div class="names-toggle-row"><p>Adicione os participantes e, se desejar, marque os cabeças de chave.</p></div>
         <div id="people-names" class="team-names generator-people"></div>
+        <div class="generator-people-actions">
+          <button id="add-generator-person" class="secondary-button add-generator-person" type="button"><span aria-hidden="true">+</span> Pessoas</button>
+          <button id="remove-generator-person" class="secondary-button add-generator-person" type="button"><span aria-hidden="true">−</span> Pessoas</button>
+        </div>
         <p id="generator-message" class="auth-message" aria-live="polite"></p>
         <button id="draw-teams" type="button">Sortear times</button>
       </section>
@@ -40,6 +44,6 @@
       <a class="home-button" href="index.html"><span aria-hidden="true"><img src="assets/casa.png" alt="" /></span> Voltar para o menu principal</a>
     </main>
     <footer class="site-footer">© 2026 RST Code. Todos os direitos reservados.</footer>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script><script src="theme.js"></script><script src="table-auth.js"></script><script src="game-storage.js?v=3"></script><script src="gerador-times.js?v=4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script><script src="theme.js"></script><script src="table-auth.js"></script><script src="game-storage.js?v=3"></script><script src="gerador-times.js?v=6"></script>
   </body>
 </html>

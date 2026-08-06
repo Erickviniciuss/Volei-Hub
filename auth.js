@@ -3,9 +3,6 @@ const signupTab = document.querySelector("#signup-tab");
 const loginForm = document.querySelector("#login-form");
 const signupForm = document.querySelector("#signup-form");
 const authMessage = document.querySelector("#auth-message");
-const spectatorToggle = document.querySelector("#spectator-toggle");
-const spectatorAccess = document.querySelector("#spectator-access");
-const spectatorCode = document.querySelector("#spectator-code");
 const confirmationCompleted = new URLSearchParams(window.location.search).get("confirmado") === "1";
 
 const config = window.SUPABASE_CONFIG;
@@ -55,18 +52,6 @@ async function requireConfiguration() {
 
 loginTab.addEventListener("click", () => showForm("login"));
 signupTab.addEventListener("click", () => showForm("signup"));
-spectatorToggle.addEventListener("click", () => {
-  spectatorAccess.hidden = !spectatorAccess.hidden;
-  spectatorToggle.textContent = spectatorAccess.hidden ? "Acompanhar jogo com código" : "Ocultar código";
-  if (!spectatorAccess.hidden) spectatorCode.focus();
-});
-document.querySelector("#spectator-enter").addEventListener("click", () => {
-  const code = spectatorCode.value.trim().toUpperCase();
-  if (!code) { setMessage("Informe o código do jogo para acompanhar.", "is-error"); return; }
-  window.location.assign(`acompanhar.html?codigo=${encodeURIComponent(code)}`);
-});
-spectatorCode.addEventListener("keydown", (event) => { if (event.key === "Enter") document.querySelector("#spectator-enter").click(); });
-
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!await requireConfiguration()) return;

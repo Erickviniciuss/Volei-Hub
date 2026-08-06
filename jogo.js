@@ -426,6 +426,12 @@ document.querySelector("#copy-share-code").addEventListener("click", async () =>
   catch { document.querySelector("#copy-share-code").textContent = currentShareCode; }
   window.setTimeout(() => { document.querySelector("#copy-share-code").textContent = "Copiar código"; }, 1800);
 });
+document.querySelector("#copy-share-link").addEventListener("click", async () => {
+  const link = new URL(`acompanhar.html?codigo=${encodeURIComponent(currentShareCode)}`, window.location.href).href;
+  try { await navigator.clipboard.writeText(link); document.querySelector("#copy-share-link").textContent = "Link copiado"; }
+  catch { document.querySelector("#copy-share-link").textContent = "Não foi possível copiar"; }
+  window.setTimeout(() => { document.querySelector("#copy-share-link").textContent = "Copiar link"; }, 1800);
+});
 document.querySelector("#new-game").addEventListener("click", () => { quickFinished.hidden = true; quickSetup.hidden = false; });
 makeQuickTeamInputs();
 

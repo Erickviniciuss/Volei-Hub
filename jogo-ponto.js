@@ -421,6 +421,12 @@ document.querySelector("#point-finish").addEventListener("click", () => { docume
 document.querySelector("#point-cancel-finish").addEventListener("click", () => { document.querySelector("#point-finish-confirm").hidden = true; });
 document.querySelector("#point-confirm-finish").addEventListener("click", () => { document.querySelector("#point-finish-confirm").hidden = true; finishPointGame(`O jogo foi encerrado na rodada ${Math.min(pointRound + 1, pointSchedule.length)}.`); });
 document.querySelector("#point-copy-share-code").addEventListener("click", async () => { try { await navigator.clipboard.writeText(pointShareCode); document.querySelector("#point-copy-share-code").textContent = "Código copiado"; } catch { document.querySelector("#point-copy-share-code").textContent = pointShareCode; } window.setTimeout(() => { document.querySelector("#point-copy-share-code").textContent = "Copiar código"; }, 1800); });
+document.querySelector("#point-copy-share-link").addEventListener("click", async () => {
+  const link = new URL(`acompanhar.html?codigo=${encodeURIComponent(pointShareCode)}`, window.location.href).href;
+  try { await navigator.clipboard.writeText(link); document.querySelector("#point-copy-share-link").textContent = "Link copiado"; }
+  catch { document.querySelector("#point-copy-share-link").textContent = "Não foi possível copiar"; }
+  window.setTimeout(() => { document.querySelector("#point-copy-share-link").textContent = "Copiar link"; }, 1800);
+});
 document.querySelector("#point-new-game").addEventListener("click", () => { document.querySelector("#point-finished").hidden = true; document.querySelector("#point-setup").hidden = false; });
 document.querySelector("#point-finished-history-toggle").addEventListener("click", () => { const history = document.querySelector("#point-finished-history"); history.hidden = !history.hidden; const open = !history.hidden; document.querySelector("#point-finished-history-toggle").setAttribute("aria-expanded", String(open)); document.querySelector("#point-finished-history-toggle").textContent = open ? "Ocultar histórico de movimentos" : "Ver histórico de movimentos"; });
 makePointInputs();

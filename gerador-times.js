@@ -32,13 +32,18 @@ function selectedSeedCount() {
   return [...document.querySelectorAll(".seed-check input:checked")].length;
 }
 
-function renderPeopleInputs() {
+function renderPeopleInputs(requestedTotal = null) {
   const saved = [...document.querySelectorAll(".generator-person")].map((input) => ({ name: input.value, seed: input.closest("label").querySelector("input[type=checkbox]")?.checked }));
-  const total = Math.max(1, Number(peopleCount.value) || 1);
+  const total = Math.max(1, Number(requestedTotal ?? saved.length ?? peopleCount.value) || 1);
   peopleCount.value = total;
   peoplePerTeam.value = Math.max(1, Number(peoplePerTeam.value) || 1);
   seedCountField.hidden = !seedEnabled.checked;
   updateTeamInformation();
+  const capacity = getTeamCount() * Number(peoplePerTeam.value);
+  if (total > capacity) {
+    generatorMessage.textContent = `A configuração atual permite no máximo ${capacity} participantes.`;
+    generatorMessage.className = "auth-message is-error";
+  }
   const seedLimit = getTeamCount() * Number(seedsPerTeam.value || 1);
   const alreadySelected = selectedSeedCount();
   const maySelectSeed = !seedEnabled.checked || alreadySelected < seedLimit;
@@ -48,6 +53,29 @@ function renderPeopleInputs() {
     return `<label class="generator-person-field"><span>Participante ${index + 1}</span><input class="generator-person" type="text" maxlength="40" value="${escapeGenerator(person.name || "")}" placeholder="Nome do participante" />${seedControl}</label>`;
   }).join("");
   seedsPerTeam.innerHTML = Array.from({ length: Math.min(6, Number(peoplePerTeam.value)) }, (_, index) => `<option value="${index + 1}" ${Number(seedsPerTeam.value || 1) === index + 1 ? "selected" : ""}>${index + 1} por time</option>`).join("");
+}
+
+function addGeneratorPerson() {
+  const current = document.querySelectorAll(".generator-person").length;
+  const capacity = getTeamCount() * Math.max(1, Number(peoplePerTeam.value) || 1);
+  if (current >= capacity) {
+    generatorMessage.textContent = `Limite atingido: ${getTeamCount()} times com ${peoplePerTeam.value} pessoas por time permitem no máximo ${capacity} participantes.`;
+    generatorMessage.className = "auth-message is-error";
+    return;
+  }
+  generatorMessage.textContent = "";
+  renderPeopleInputs(current + 1);
+}
+
+function removeGeneratorPerson() {
+  const current = document.querySelectorAll(".generator-person").length;
+  if (current <= 1) {
+    generatorMessage.textContent = "Mantenha pelo menos um participante cadastrado.";
+    generatorMessage.className = "auth-message is-error";
+    return;
+  }
+  generatorMessage.textContent = "";
+  renderPeopleInputs(current - 1);
 }
 
 function renderGeneratedTeams(teams) {
@@ -63,7 +91,15 @@ function renderGeneratedTeams(teams) {
 }
 
 function drawTeams() {
-  const people = [...document.querySelectorAll(".generator-person")].map((input, index) => ({ name: input.value.trim() || `Participante ${index + 1}`, seed: seedEnabled.checked && input.closest("label").querySelector("input[type=checkbox]")?.checked }));
+  const inputs = [...document.querySelectorAll(".generator-person")];
+  const missingName = inputs.findIndex((input) => !input.value.trim());
+  if (missingName >= 0) {
+    generatorMessage.textContent = `Informe o nome do Participante ${missingName + 1} antes de sortear os times.`;
+    generatorMessage.className = "auth-message is-error";
+    inputs[missingName].focus();
+    return;
+  }
+  const people = inputs.map((input) => ({ name: input.value.trim(), seed: seedEnabled.checked && input.closest("label").querySelector("input[type=checkbox]")?.checked }));
   const teamCount = getTeamCount();
   const capacity = Number(peoplePerTeam.value);
   const totalCapacity = teamCount * capacity;
@@ -137,15 +173,18 @@ async function importToGame(type) {
   }
   const teams = lastDraw.map((team, index) => `Equipe ${index + 1}`);
   const players = lastDraw.map((team) => team.map((person) => person.name));
+  const mode = type === "points" ? "Jogo Ponto a Ponto" : "Jogo por Resultado";
+  if (!window.confirm(`Importar os times para ${mode}?`)) return;
   localStorage.setItem(type === "points" ? "volley-generator-import-points" : "volley-generator-import", JSON.stringify({ teams, players, playerCount: Math.max(3, largestTeam) }));
   window.location.href = type === "points" ? "jogoajogo.html" : "jogo.html";
 }
 
-peopleCount.addEventListener("input", renderPeopleInputs);
 peoplePerTeam.addEventListener("input", renderPeopleInputs);
 teamTotal.addEventListener("input", renderPeopleInputs);
 seedsPerTeam.addEventListener("change", renderPeopleInputs);
 seedEnabled.addEventListener("change", () => { seedCountField.hidden = !seedEnabled.checked; renderPeopleInputs(); });
 peopleNames.addEventListener("change", (event) => { if (event.target.matches(".seed-check input")) renderPeopleInputs(); });
 document.querySelector("#draw-teams").addEventListener("click", drawTeams);
+document.querySelector("#add-generator-person").addEventListener("click", addGeneratorPerson);
+document.querySelector("#remove-generator-person").addEventListener("click", removeGeneratorPerson);
 renderPeopleInputs();
