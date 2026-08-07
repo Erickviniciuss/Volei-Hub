@@ -19,6 +19,7 @@ function viewerTeamDropdown(game, team, away = false) {
   const content = players.length ? `<ul>${players.map((player) => `<li>${escapeViewer(player)}</li>`).join("")}</ul>` : "<span>Nenhum participante cadastrado.</span>";
   return `<div class="team-dropdown ${away ? "team-away" : ""}"><details><summary>${escapeViewer(team)}</summary><div class="dropdown-menu"><strong>${escapeViewer(team)}</strong>${content}</div></details></div>`;
 }
+// test
 function viewerPointRanking(game) {
   if (Array.isArray(game.playerStandings)) return game.playerStandings.slice(0, 10);
   const players = new Map();
