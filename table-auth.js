@@ -1,9 +1,7 @@
 const tableConfig = window.SUPABASE_CONFIG;
 document.body.dataset.theme = localStorage.getItem("volley-theme") || "dark";
 const tableHasKey = tableConfig?.anonKey && !tableConfig.anonKey.startsWith("COLE_A_CHAVE");
-const tableSupabase = tableHasKey && window.supabase
-  ? window.supabase.createClient(tableConfig.url, tableConfig.anonKey)
-  : null;
+const tableSupabase = tableHasKey ? window.supabaseClient || null : null;
 
 function returnToLogin() {
   window.location.replace("login.html");

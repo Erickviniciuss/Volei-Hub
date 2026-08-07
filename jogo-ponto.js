@@ -159,6 +159,37 @@ function renderPointMatch() {
   document.querySelector("#point-current-match").innerHTML = `<article class="point-match"><section><strong>${escapePoint(home)}</strong><b>${score.home}</b>${controls(home)}</section><span>×</span><section><strong>${escapePoint(away)}</strong><b>${score.away}</b>${controls(away)}</section></article>${advance}`;
   renderPointRanking(); renderPointLivePlayerRanking(); renderPointOverview(); renderPointHistory();
 }
+function pointTeamDropdown(team, isAway = false) {
+  const teamIndex = pointTeams.indexOf(team);
+  const players = pointRoster[teamIndex] || [];
+  const content = players.length ? `<ul>${players.map((player) => `<li>${escapePoint(player)}</li>`).join("")}</ul>` : "<span>Nenhum participante cadastrado.</span>";
+  return `<div class="team-dropdown ${isAway ? "team-away" : ""}"><details><summary>${escapePoint(team)}</summary><div class="dropdown-menu"><strong>${escapePoint(team)}</strong>${content}</div></details></div>`;
+}
+
+function renderPointRanking() {
+  document.querySelector("#point-ranking").innerHTML = getPointStandings().map((team, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong>${pointTeamDropdown(team.name)}<small class="ranking-stats"><span><b>Vit.</b>${team.wins}</span><span><b>Der.</b>${team.losses}</span><span><b>Jogos</b>${team.games}</span><span><b>Pontos</b>${team.points}</span><span><b>Saldo</b>${team.difference >= 0 ? "+" : ""}${team.difference}</span></small></div>`).join("");
+}
+
+function renderPointMatch() {
+  const round = pointSchedule[pointRound];
+  if (!round) {
+    document.querySelector("#point-round-title").textContent = "Jogo concluído";
+    document.querySelector("#point-progress").textContent = "Todas as rodadas foram concluídas.";
+    document.querySelector("#point-current-match").innerHTML = '<div class="quick-bye">Todos os placares foram registrados.</div>';
+    renderPointRanking(); renderPointLivePlayerRanking(); renderPointOverview(); renderPointHistory(); return;
+  }
+  const [home, away] = round.matches[pointMatch];
+  const key = pointKey(pointRound, pointMatch);
+  const score = pointScores.get(key) || { home: 0, away: 0, finished: false, confirmed: false };
+  document.querySelector("#point-round-title").textContent = `Rodada ${pointRound + 1}`;
+  document.querySelector("#point-progress").textContent = `${pointRound + 1} de ${pointSchedule.length} rodadas · primeiro time a ${pointsToWin.value} pontos`;
+  document.querySelector("#point-share-code-value").textContent = pointShareCode || "--";
+  const controls = (team) => score.finished ? "" : `<button class="point-add" data-team="${escapePoint(team)}" type="button" aria-label="Registrar ponto para ${escapePoint(team)}">+</button>`;
+  const advance = score.finished ? `<button id="point-advance-match" class="confirm-round" type="button">${pointMatch < round.matches.length - 1 || pointRound < pointSchedule.length - 1 ? "Avançar para a próxima partida" : "Concluir jogo"}</button>` : "";
+  document.querySelector("#point-current-match").innerHTML = `<article class="point-match"><section>${pointTeamDropdown(home)}<b>${score.home}</b>${controls(home)}</section><span>×</span><section>${pointTeamDropdown(away, true)}<b>${score.away}</b>${controls(away)}</section></article>${advance}`;
+  renderPointRanking(); renderPointLivePlayerRanking(); renderPointOverview(); renderPointHistory();
+}
+
 function registerPoint(player) {
   const key = pointKey(pointRound, pointMatch);
   const score = pointScores.get(key) || { home: 0, away: 0, finished: false, confirmed: false };
@@ -382,6 +413,11 @@ document.querySelector("#point-current-match").addEventListener("click", (event)
   const add = event.target.closest(".point-add");
   if (add) { if (pointRequireNames.checked) { selectedPointTeam = add.dataset.team; registerPoint("Outros"); } else openScorerDialog(add.dataset.team); return; }
   if (event.target.closest("#point-advance-match")) advancePointMatch();
+});
+document.querySelector("#point-ranking").addEventListener("click", (event) => {
+  const selected = event.target.closest("details");
+  if (!selected) return;
+  document.querySelectorAll("#point-ranking details[open]").forEach((details) => { if (details !== selected) details.removeAttribute("open"); });
 });
 document.querySelector("#point-scorer-options").addEventListener("click", (event) => {
   const choice = event.target.closest(".point-scorer-choice");

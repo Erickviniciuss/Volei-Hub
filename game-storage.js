@@ -2,7 +2,7 @@ const QUICK_GAME_ACTIVE_KEY = "volley-hub-quick-game-active";
 const QUICK_GAME_RESULTS_KEY = "volley-hub-quick-game-results";
 const cloudConfig = window.SUPABASE_CONFIG;
 const cloudEnabled = cloudConfig?.anonKey && !cloudConfig.anonKey.startsWith("COLE_A_CHAVE") && window.supabase;
-const cloudSupabase = cloudEnabled ? window.supabase.createClient(cloudConfig.url, cloudConfig.anonKey) : null;
+const cloudSupabase = cloudEnabled ? window.supabaseClient || null : null;
 
 window.quickGameStore = {
   getActive() {

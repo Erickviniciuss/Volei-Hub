@@ -30,6 +30,7 @@
           <label for="login-password">Senha</label>
           <input id="login-password" type="password" autocomplete="current-password" placeholder="Sua senha" required />
           <button type="submit">Entrar na conta</button>
+          <button id="password-recovery-toggle" class="recovery-link" type="button">Esqueci minha senha</button>
           <a class="secondary-button spectator-link" href="acompanhar.html">Acompanhar jogo com código</a>
         </form>
         <form id="signup-form" class="auth-form" hidden>
@@ -43,6 +44,21 @@
           <input id="signup-password-confirm" type="password" autocomplete="new-password" placeholder="Repita sua senha" minlength="6" required />
           <button type="submit">Criar minha conta</button>
         </form>
+        <form id="password-recovery-form" class="auth-form" hidden>
+          <p class="auth-intro">Informe o e-mail da sua conta. Enviaremos um link para criar uma nova senha.</p>
+          <label for="recovery-email">E-mail de recuperação</label>
+          <input id="recovery-email" type="email" autocomplete="email" placeholder="voce@email.com" required />
+          <button type="submit">Enviar e-mail de recuperação</button>
+          <button id="back-to-login" class="secondary-button" type="button">Voltar para entrar</button>
+        </form>
+        <form id="password-update-form" class="auth-form" hidden>
+          <p class="auth-intro">Defina sua nova senha para concluir a recuperação.</p>
+          <label for="new-password">Nova senha</label>
+          <input id="new-password" type="password" autocomplete="new-password" placeholder="Mínimo de 6 caracteres" minlength="6" required />
+          <label for="new-password-confirm">Confirmar nova senha</label>
+          <input id="new-password-confirm" type="password" autocomplete="new-password" placeholder="Repita a nova senha" minlength="6" required />
+          <button type="submit">Salvar nova senha</button>
+        </form>
         <p id="auth-message" class="auth-message" role="status" aria-live="polite"></p>
       </section>
     </main>
@@ -50,6 +66,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-config.js"></script>
     <script src="theme.js"></script>
-    <script src="auth.js?v=3"></script>
+    <script src="auth.js?v=4"></script>
   </body>
 </html>

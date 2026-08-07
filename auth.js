@@ -2,14 +2,16 @@ const loginTab = document.querySelector("#login-tab");
 const signupTab = document.querySelector("#signup-tab");
 const loginForm = document.querySelector("#login-form");
 const signupForm = document.querySelector("#signup-form");
+const recoveryForm = document.querySelector("#password-recovery-form");
+const passwordUpdateForm = document.querySelector("#password-update-form");
+const authTabs = document.querySelector(".auth-tabs");
 const authMessage = document.querySelector("#auth-message");
 const confirmationCompleted = new URLSearchParams(window.location.search).get("confirmado") === "1";
+const recoveryMode = new URLSearchParams(window.location.hash.slice(1)).get("type") === "recovery";
 
 const config = window.SUPABASE_CONFIG;
 const hasSupabaseKey = config?.anonKey && !config.anonKey.startsWith("COLE_A_CHAVE");
-const supabaseClient = hasSupabaseKey && window.supabase
-  ? window.supabase.createClient(config.url, config.anonKey)
-  : null;
+const supabaseClient = hasSupabaseKey ? window.supabaseClient || null : null;
 
 function setMessage(message, type = "") {
   authMessage.textContent = message;
@@ -27,11 +29,33 @@ function showForm(form) {
   const isLogin = form === "login";
   loginForm.hidden = !isLogin;
   signupForm.hidden = isLogin;
+  recoveryForm.hidden = true;
+  passwordUpdateForm.hidden = true;
+  authTabs.hidden = false;
   loginTab.classList.toggle("is-active", isLogin);
   signupTab.classList.toggle("is-active", !isLogin);
   loginTab.setAttribute("aria-selected", String(isLogin));
   signupTab.setAttribute("aria-selected", String(!isLogin));
   setMessage("");
+}
+
+function showRecoveryRequest() {
+  loginForm.hidden = true;
+  signupForm.hidden = true;
+  passwordUpdateForm.hidden = true;
+  recoveryForm.hidden = false;
+  authTabs.hidden = true;
+  setMessage("");
+  document.querySelector("#recovery-email").focus();
+}
+
+function showPasswordUpdate() {
+  loginForm.hidden = true;
+  signupForm.hidden = true;
+  recoveryForm.hidden = true;
+  passwordUpdateForm.hidden = false;
+  authTabs.hidden = true;
+  setMessage("Crie uma nova senha para acessar sua conta.");
 }
 
 function showConfirmationSuccess() {
@@ -52,6 +76,39 @@ async function requireConfiguration() {
 
 loginTab.addEventListener("click", () => showForm("login"));
 signupTab.addEventListener("click", () => showForm("signup"));
+document.querySelector("#password-recovery-toggle").addEventListener("click", showRecoveryRequest);
+document.querySelector("#back-to-login").addEventListener("click", () => showForm("login"));
+
+recoveryForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!await requireConfiguration()) return;
+  const button = recoveryForm.querySelector("button[type=submit]");
+  button.disabled = true;
+  setMessage("Enviando e-mail de recuperação…");
+  const { error } = await supabaseClient.auth.resetPasswordForEmail(document.querySelector("#recovery-email").value.trim(), {
+    redirectTo: new URL("login.html", window.location.href).href,
+  });
+  button.disabled = false;
+  if (error) setMessage(authErrorMessage(error), "is-error");
+  else setMessage("Se o e-mail estiver cadastrado, você receberá um link para criar uma nova senha.", "is-success");
+});
+
+passwordUpdateForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!await requireConfiguration()) return;
+  const password = document.querySelector("#new-password").value;
+  const confirmation = document.querySelector("#new-password-confirm").value;
+  if (password !== confirmation) { setMessage("As senhas precisam ser iguais.", "is-error"); return; }
+  const button = passwordUpdateForm.querySelector("button[type=submit]");
+  button.disabled = true;
+  const { error } = await supabaseClient.auth.updateUser({ password });
+  button.disabled = false;
+  if (error) { setMessage(authErrorMessage(error), "is-error"); return; }
+  window.history.replaceState({}, document.title, "login.html");
+  showForm("login");
+  setMessage("Senha alterada com sucesso. Entre com sua nova senha.", "is-success");
+});
+
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!await requireConfiguration()) return;
@@ -98,10 +155,13 @@ signupForm.addEventListener("submit", async (event) => {
 
 if (supabaseClient) {
   supabaseClient.auth.getSession().then(({ data }) => {
+    if (recoveryMode) { showPasswordUpdate(); return; }
     if (data.session && !confirmationCompleted) openTable();
   });
+  supabaseClient.auth.onAuthStateChange((event) => { if (event === "PASSWORD_RECOVERY") showPasswordUpdate(); });
 } else {
   setMessage("Acesse sua conta assim que a chave pública do Supabase for adicionada.");
 }
 
-showConfirmationSuccess();
+if (recoveryMode) showPasswordUpdate();
+else showConfirmationSuccess();

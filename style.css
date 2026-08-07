@@ -60,6 +60,8 @@ body {
 .auth-form[hidden] { display: none; }
 .auth-form label { margin-top: 4px; }
 .auth-form button { width: 100%; margin-top: 13px; }
+.auth-form .recovery-link { min-height: auto; margin-top: 2px; padding: 4px 0; color: var(--purple-dark); background: transparent; box-shadow: none; font-size: .82rem; text-align: left; }
+.auth-form .recovery-link:hover { color: var(--purple); background: transparent; transform: none; text-decoration: underline; }
 .spectator-access { display: grid; gap: 9px; padding-top: 12px; border-top: 1px solid var(--line); }
 .spectator-access[hidden] { display: none; }
 .spectator-link { display: flex; align-items: center; justify-content: center; text-decoration: none; }
@@ -110,6 +112,21 @@ body {
 .dashboard-footer { display: flex; align-items: center; justify-content: center; gap: 20px; min-height: 58px; padding: 12px 24px; border-top: 1px solid #374151; color: #9ca3af; background: #000a17; font-size: .76rem; }
 .dashboard-footer a, .dashboard-footer button { padding: 0; border: 0; color: #67e8f9; background: transparent; box-shadow: none; font: 700 .78rem "Outfit", sans-serif; text-decoration: none; }
 .dashboard-footer button:hover { color: #67e8f9; background: transparent; transform: none; text-decoration: underline; }
+
+/* Tema claro do painel principal */
+body[data-theme="light"] .dashboard-shell { color: #1e293b; background: #f8fafc; }
+body[data-theme="light"] .dashboard-header { border-color: #374151; background: #1f2937; }
+body[data-theme="light"] .dashboard-header .account-card { color: #f8fafc; }
+body[data-theme="light"] .dashboard-header .account-card span { color: #9ca3af; }
+body[data-theme="light"] .dashboard-welcome .welcome-copy { padding: 24px; border: 1px solid #374151; border-radius: 12px; color: #f8fafc; background: #1f2937; box-shadow: 0 10px 24px rgba(30, 41, 59, .16); }
+body[data-theme="light"] .welcome-copy h1 { color: #f8fafc; }
+body[data-theme="light"] .quick-actions-section h2 { color: #1e293b; }
+body[data-theme="light"] .welcome-copy > p:not(:first-child) { color: #d1d5db; }
+body[data-theme="light"] .dashboard-action { border-color: #e2e8f0; color: #1e293b; background: #ffffff; box-shadow: 0 8px 20px rgba(30, 41, 59, .06); }
+body[data-theme="light"] .dashboard-action:hover { border-color: #22d3ee; background: #effcff; }
+body[data-theme="light"] .dashboard-action.is-disabled:hover { border-color: #e2e8f0; background: #ffffff; }
+body[data-theme="light"] .dashboard-action small { color: #64748b; }
+body[data-theme="light"] .dashboard-footer { border-color: #374151; color: #9ca3af; background: #1f2937; }
 
 .menu-shell { display: grid; min-height: 100vh; grid-template-columns: 238px 1fr; background: #000a17; }
 .sidebar { display: flex; min-height: 100vh; padding: 10px 20px 30px; flex-direction: column; border-right: 1px solid #374151; background: #1f2937; }
@@ -338,6 +355,7 @@ button:hover { background: var(--purple-dark); transform: translateY(-1px); }
 .coming-soon-page { min-height: calc(100vh - 70px); }
 .config-account-form { display: grid; max-width: 520px; gap: 9px; margin-top: 22px; }
 .config-account-form button { width: min(100%, 260px); margin-top: 9px; }
+.password-recovery-card > p:not(.eyebrow) { max-width: 520px; margin: 10px 0 0; color: var(--muted); line-height: 1.45; }
 .point-players-panel { display: block; }
 .point-current-match { margin-top: 16px; }
 .point-match { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 18px; padding: 24px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); }

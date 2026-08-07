@@ -1,8 +1,6 @@
 const menuConfig = window.SUPABASE_CONFIG;
 const menuHasKey = menuConfig?.anonKey && !menuConfig.anonKey.startsWith("COLE_A_CHAVE");
-const menuSupabase = menuHasKey && window.supabase
-  ? window.supabase.createClient(menuConfig.url, menuConfig.anonKey)
-  : null;
+const menuSupabase = menuHasKey ? window.supabaseClient || null : null;
 const nameNode = document.querySelector("#account-name");
 const emailNode = document.querySelector("#account-email");
 const logoutButton = document.querySelector("#logout-button");

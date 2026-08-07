@@ -191,7 +191,7 @@ function validateScores() {
 
 function renderLiveRanking() {
   const standings = buildStandings();
-  document.querySelector("#live-ranking-list").innerHTML = standings.map((team, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong><span>${escapeQuick(team.name)}</span>${rankingStats(team)}</div>`).join("");
+  document.querySelector("#live-ranking-list").innerHTML = standings.map((team, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong>${quickTeamDropdown(team.name)}${rankingStats(team)}</div>`).join("");
 }
 
 function persistPartialScores() {
@@ -268,6 +268,22 @@ function applyLiveSettings() {
 function renderOverview() {
   document.querySelector("#save-retro-scores").hidden = !retroEditingUnlocked;
   overviewRounds.innerHTML = quickSchedule.map((round, index) => `<article class="round overview-round ${index === currentRound ? "is-current" : ""}"><header class="round-title">Rodada ${index + 1}<span>${index === currentRound ? "ATUAL" : index < currentRound ? "CONCLUÍDA" : "AGUARDANDO"}</span></header>${round.matches.map(([home, away], gameIndex) => { const result = scores.get(scoreKey(index, gameIndex)); const editable = retroEditingUnlocked && index < currentRound; const currentGame = index === currentRound && gameIndex === confirmedGameCount; const score = result && result[0] !== "" && result[1] !== "" ? `${result[0]} × ${result[1]}` : "×"; return editable ? `<div class="match overview-match retro-match"><span>${escapeQuick(home)}</span><span class="retro-score-inputs"><input data-retro-round="${index}" data-retro-game="${gameIndex}" data-side="0" type="number" min="0" value="${result?.[0] ?? ""}" aria-label="Novo placar de ${escapeQuick(home)}" /><b>×</b><input data-retro-round="${index}" data-retro-game="${gameIndex}" data-side="1" type="number" min="0" value="${result?.[1] ?? ""}" aria-label="Novo placar de ${escapeQuick(away)}" /></span><span class="team-away">${escapeQuick(away)}</span></div>` : `<div class="match overview-match ${currentGame ? "is-current-match" : ""}"><span>${escapeQuick(home)}</span><span class="overview-score">${score}</span><span class="team-away">${escapeQuick(away)}</span></div>`; }).join("")}${round.bye ? `<div class="bye">Folga: <strong>${escapeQuick(round.bye)}</strong></div>` : ""}</article>`).join("");
+}
+
+function renderOverview() {
+  document.querySelector("#save-retro-scores").hidden = !retroEditingUnlocked;
+  overviewRounds.innerHTML = quickSchedule.map((round, index) => {
+    const state = index === currentRound ? "ATUAL" : index < currentRound ? "CONCLUÍDA" : "AGUARDANDO";
+    const matches = round.matches.map(([home, away], gameIndex) => {
+      const result = scores.get(scoreKey(index, gameIndex));
+      const editable = retroEditingUnlocked && index < currentRound;
+      const currentGame = index === currentRound && gameIndex === confirmedGameCount;
+      const score = result && result[0] !== "" && result[1] !== "" ? `${result[0]} × ${result[1]}` : "×";
+      if (editable) return `<div class="match overview-match retro-match"><span>${escapeQuick(home)}</span><span class="retro-score-inputs"><input data-retro-round="${index}" data-retro-game="${gameIndex}" data-side="0" type="number" min="0" value="${result?.[0] ?? ""}" aria-label="Novo placar de ${escapeQuick(home)}" /><b>×</b><input data-retro-round="${index}" data-retro-game="${gameIndex}" data-side="1" type="number" min="0" value="${result?.[1] ?? ""}" aria-label="Novo placar de ${escapeQuick(away)}" /></span><span class="team-away">${escapeQuick(away)}</span></div>`;
+      return `<div class="match overview-match ${currentGame ? "is-current-match" : ""}">${quickTeamDropdown(home)}<span class="overview-score">${score}</span>${quickTeamDropdown(away, true)}</div>`;
+    }).join("");
+    return `<article class="round overview-round ${index === currentRound ? "is-current" : ""}"><header class="round-title">Rodada ${index + 1}<span>${state}</span></header>${matches}${round.bye ? `<div class="bye">Folga: <strong>${escapeQuick(round.bye)}</strong></div>` : ""}</article>`;
+  }).join("");
 }
 
 async function unlockRetroEditing() {
@@ -385,6 +401,16 @@ currentMatches.addEventListener("click", (event) => {
   const selected = event.target.closest("details");
   if (!selected) return;
   currentMatches.querySelectorAll("details[open]").forEach((details) => { if (details !== selected) details.removeAttribute("open"); });
+});
+overviewRounds.addEventListener("click", (event) => {
+  const selected = event.target.closest("details");
+  if (!selected) return;
+  overviewRounds.querySelectorAll("details[open]").forEach((details) => { if (details !== selected) details.removeAttribute("open"); });
+});
+document.querySelector("#live-ranking-list").addEventListener("click", (event) => {
+  const selected = event.target.closest("details");
+  if (!selected) return;
+  document.querySelectorAll("#live-ranking-list details[open]").forEach((details) => { if (details !== selected) details.removeAttribute("open"); });
 });
 document.querySelector("#confirm-round").addEventListener("click", confirmScores);
 document.querySelector("#adjust-game-toggle").addEventListener("click", openLiveSettings);

@@ -95,6 +95,7 @@ function openViewerFromCode() {
 }
 
 viewerCodeInput.value = liveCode || "";
+document.querySelector(".viewer-access").hidden = Boolean(liveCode);
 viewerEnterCode.addEventListener("click", openViewerFromCode);
 viewerCodeInput.addEventListener("keydown", (event) => { if (event.key === "Enter") openViewerFromCode(); });
 
