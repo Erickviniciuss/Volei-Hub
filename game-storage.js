@@ -55,6 +55,10 @@ window.quickGameStore = {
     if (!cloudSupabase || !shareCode) return { error: null };
     return cloudSupabase.from("live_games").update({ is_active: false, updated_at: new Date().toISOString() }).eq("share_code", shareCode);
   },
+  async finishLiveGame(shareCode, result) {
+    if (!cloudSupabase || !shareCode) return { error: null };
+    return cloudSupabase.from("live_games").update({ game_data: { ...result, status: "finished", started: false }, is_active: false, updated_at: new Date().toISOString() }).eq("share_code", shareCode);
+  },
   async getLiveGame(shareCode) {
     if (!cloudSupabase) return { data: null, error: new Error("Supabase não configurado") };
     const { data, error } = await cloudSupabase.from("live_games").select("game_data,is_active,updated_at").eq("share_code", shareCode).maybeSingle();

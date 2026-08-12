@@ -365,12 +365,12 @@ async function printQuickGamePdf() {
 
 async function finishQuickGame(message) {
   const standings = buildStandings();
-  const result = { id: Date.now(), startedAt: gameStartedAt, finishedAt: new Date().toISOString(), reason: message, standings, schedule: quickSchedule, scores: [...scores.entries()], teams: currentTeams, players: currentPlayers, playerCount: currentPlayerCount };
+  const result = { id: Date.now(), gameType: "result", startedAt: gameStartedAt, finishedAt: new Date().toISOString(), reason: message, standings, schedule: quickSchedule, scores: [...scores.entries()], teams: currentTeams, players: currentPlayers, playerCount: currentPlayerCount };
   window.quickGameStore.addResult(result);
   const { error } = await window.quickGameStore.saveResultToCloud(result);
   if (error) console.warn("Não foi possível salvar o resultado no Supabase.", error);
   window.quickGameStore.clearActive();
-  await window.quickGameStore.closeLiveGame(currentShareCode);
+  await window.quickGameStore.finishLiveGame(currentShareCode, result);
   quickGame.hidden = true; overview.hidden = true; quickFinished.hidden = false;
   document.querySelector("#finished-copy").textContent = message;
   document.querySelector("#finished-ranking").innerHTML = `<h3>Classificação final</h3><div class="ranking-list">${standings.map((team, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong><span>${escapeQuick(team.name)}</span>${rankingStats(team)}</div>`).join("")}</div>`;

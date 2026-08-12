@@ -19,8 +19,14 @@ function shuffle(items) {
   }
   return copy;
 }
-function getIdealTeamCount() { return Math.ceil(Math.max(1, Number(peopleCount.value) || 1) / Math.max(1, Number(peoplePerTeam.value) || 1)); }
-function getTeamCount() { return Math.max(1, Number(teamTotal.value) || getIdealTeamCount()); }
+function getPeoplePerTeam() { const value = Number(peoplePerTeam.value); return Number.isInteger(value) && value > 0 ? value : null; }
+function getIdealTeamCount() { const perTeam = getPeoplePerTeam(); return perTeam ? Math.ceil(Math.max(1, Number(peopleCount.value) || 1) / perTeam) : null; }
+function getTeamCount() { const value = Number(teamTotal.value); return Number.isInteger(value) && value > 0 ? value : null; }
+
+function refreshIdealHint() {
+  const ideal = getIdealTeamCount();
+  idealTeamCount.innerHTML = ideal ? `Quantidade ideal pela configuração atual: <strong>${ideal} ${ideal === 1 ? "time" : "times"}</strong>. Você pode escolher outra quantidade para o sorteio.` : "Informe a quantidade de pessoas por time para ver a quantidade ideal de equipes.";
+}
 
 function updateTeamInformation() {
   const ideal = getIdealTeamCount();
@@ -91,6 +97,13 @@ function renderGeneratedTeams(teams) {
 }
 
 function drawTeams() {
+  const teamCount = getTeamCount();
+  const capacity = getPeoplePerTeam();
+  if (!teamCount || !capacity) {
+    generatorMessage.textContent = "Informe a quantidade de times e de pessoas por time antes de sortear.";
+    generatorMessage.className = "auth-message is-error";
+    return;
+  }
   const inputs = [...document.querySelectorAll(".generator-person")];
   const missingName = inputs.findIndex((input) => !input.value.trim());
   if (missingName >= 0) {
@@ -100,8 +113,6 @@ function drawTeams() {
     return;
   }
   const people = inputs.map((input) => ({ name: input.value.trim(), seed: seedEnabled.checked && input.closest("label").querySelector("input[type=checkbox]")?.checked }));
-  const teamCount = getTeamCount();
-  const capacity = Number(peoplePerTeam.value);
   const totalCapacity = teamCount * capacity;
   if (people.length > totalCapacity) {
     generatorMessage.textContent = `Não é possível sortear ${people.length} pessoas em ${teamCount} times com ${capacity} vagas por time.`;
@@ -179,8 +190,8 @@ async function importToGame(type) {
   window.location.href = type === "points" ? "jogoajogo.html" : "jogo.html";
 }
 
-peoplePerTeam.addEventListener("input", renderPeopleInputs);
-teamTotal.addEventListener("input", renderPeopleInputs);
+peoplePerTeam.addEventListener("input", () => { generatorMessage.textContent = ""; refreshIdealHint(); });
+teamTotal.addEventListener("input", () => { generatorMessage.textContent = ""; refreshIdealHint(); });
 seedsPerTeam.addEventListener("change", renderPeopleInputs);
 seedEnabled.addEventListener("change", () => { seedCountField.hidden = !seedEnabled.checked; renderPeopleInputs(); });
 peopleNames.addEventListener("change", (event) => { if (event.target.matches(".seed-check input")) renderPeopleInputs(); });

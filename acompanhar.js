@@ -59,12 +59,15 @@ function standingsFor(game) {
 }
 
 function renderViewer(game) {
+  const finished = game.isActive === false || game.status === "finished";
+  document.querySelector("#viewer-print-pdf").hidden = !finished;
   viewerCode.textContent = `Código: ${liveCode}`;
   viewerStatus.textContent = `Atualizado às ${new Date(game.updatedAt || Date.now()).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}.`;
   document.querySelector("#viewer-ranking").innerHTML = standingsFor(game).map((team, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong><span>${escapeViewer(team.name)}</span>${viewerStats(team)}</div>`).join("");
   const scores = new Map(game.scores || []);
   const currentGame = Number(game.gameType === "points" ? game.pointMatch : game.confirmedGameCount) || 0;
   document.querySelector("#viewer-rounds").innerHTML = game.schedule.map((round, roundIndex) => `<article class="round overview-round ${roundIndex === game.currentRound ? "is-current" : ""}"><header class="round-title">Rodada ${roundIndex + 1}<span>${roundIndex === game.currentRound ? "ATUAL" : roundIndex < game.currentRound ? "CONCLUÍDA" : "AGUARDANDO"}</span></header>${round.matches.map(([home, away], gameIndex) => { const score = scores.get(scoreKeyViewer(roundIndex, gameIndex)); const value = score ? (Array.isArray(score) ? `${score[0]} × ${score[1]}` : `${score.home} × ${score.away}`) : "×"; return `<div class="match overview-match ${roundIndex === game.currentRound && gameIndex === currentGame ? "is-current-match" : ""}">${viewerTeamDropdown(game, home)}<span class="overview-score">${value}</span>${viewerTeamDropdown(game, away, true)}</div>`; }).join("")}${round.bye ? `<div class="bye">Folga: <strong>${escapeViewer(round.bye)}</strong></div>` : ""}</article>`).join("");
+  if (finished) viewerStatus.textContent = game.reason || "Este jogo foi encerrado.";
   viewerGame = game;
   const playerSection = document.querySelector("#viewer-player-ranking-section");
   if (game.gameType === "points") {
@@ -88,6 +91,18 @@ async function loadViewerGame() {
   renderViewer(data);
 }
 
+function printViewerPdf() {
+  if (!viewerGame) return;
+  const scores = new Map(viewerGame.scores || []);
+  const ranking = standingsFor(viewerGame).map((team, index) => `<tr><td>${index + 1}º</td><td>${escapeViewer(team.name)}</td><td>${team.games}</td><td>${team.wins}</td><td>${team.losses}</td><td>${team.points}</td><td>${team.difference >= 0 ? "+" : ""}${team.difference}</td></tr>`).join("");
+  const rounds = (viewerGame.schedule || []).map((round, roundIndex) => `<section><h2>Rodada ${roundIndex + 1}</h2>${round.matches.map(([home, away], matchIndex) => { const score = scores.get(scoreKeyViewer(roundIndex, matchIndex)); const value = score ? (Array.isArray(score) ? `${score[0]} × ${score[1]}` : `${score.home} × ${score.away}`) : "×"; return `<p>${escapeViewer(home)} <strong>${value}</strong> ${escapeViewer(away)}</p>`; }).join("")}${round.bye ? `<p>Folga: ${escapeViewer(round.bye)}</p>` : ""}</section>`).join("");
+  const report = window.open("", "_blank");
+  if (!report) return;
+  report.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Volei Hub - Resultado</title><style>body{font-family:Arial,sans-serif;color:#1e293b;margin:32px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #cbd5e1;padding:8px;text-align:left}th{background:#1f2937;color:#fff}section{break-inside:avoid;border:1px solid #cbd5e1;border-radius:8px;padding:14px;margin-top:18px}h2{margin-top:0}strong{color:#0e7490}</style></head><body><h1>VÔLEI HUB</h1><p>${escapeViewer(viewerGame.reason || "Jogo encerrado")}</p><h2>Classificação final</h2><table><thead><tr><th>#</th><th>Equipe</th><th>Jogos</th><th>Vit.</th><th>Der.</th><th>Pontos</th><th>Saldo</th></tr></thead><tbody>${ranking}</tbody></table>${rounds}</body></html>`);
+  report.document.close();
+  window.setTimeout(() => { report.focus(); report.print(); }, 300);
+}
+
 function openViewerFromCode() {
   const code = viewerCodeInput.value.trim().toUpperCase();
   if (!code) { viewerStatus.textContent = "Informe o código do jogo para acompanhar."; viewerStatus.classList.add("is-error"); viewerCodeInput.focus(); return; }
@@ -98,6 +113,7 @@ viewerCodeInput.value = liveCode || "";
 document.querySelector(".viewer-access").hidden = Boolean(liveCode);
 viewerEnterCode.addEventListener("click", openViewerFromCode);
 viewerCodeInput.addEventListener("keydown", (event) => { if (event.key === "Enter") openViewerFromCode(); });
+document.querySelector("#viewer-print-pdf").addEventListener("click", printViewerPdf);
 
 const viewerClient = window.quickGameStore.getCloudClient();
 if (!viewerClient) { viewerStatus.textContent = "O Supabase não está configurado para o acompanhamento ao vivo."; viewerStatus.classList.add("is-error"); }
@@ -105,7 +121,6 @@ else if (!liveCode) { viewerStatus.textContent = "Informe o código do jogo acim
 else {
   loadViewerGame();
   viewerClient.channel(`live-game-${liveCode}`).on("postgres_changes", { event: "*", schema: "public", table: "live_games", filter: `share_code=eq.${liveCode}` }, (payload) => {
-    if (payload.new?.is_active === false) { viewerStatus.textContent = "Este jogo foi encerrado."; viewerContent.hidden = true; return; }
     loadViewerGame();
   }).subscribe();
   window.setInterval(loadViewerGame, 10000);

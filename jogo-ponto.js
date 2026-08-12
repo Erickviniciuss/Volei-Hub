@@ -361,7 +361,7 @@ async function finishPointGame(message) {
   const { error } = await window.quickGameStore.saveResultToCloud(result);
   if (error) console.warn("Não foi possível salvar o resultado no Supabase.", error);
   window.quickGameStore.clearActive();
-  await window.quickGameStore.closeLiveGame(pointShareCode);
+  await window.quickGameStore.finishLiveGame(pointShareCode, result);
   document.querySelector("#point-game").hidden = true;
   document.querySelector("#point-overview").hidden = true;
   document.querySelector("#point-finished").hidden = false;
