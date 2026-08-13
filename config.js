@@ -20,7 +20,20 @@ const tieBreakMessage = document.querySelector("#tie-break-message");
 tieBreakMode.insertAdjacentHTML("afterend", '<label id="tie-break-visibility" class="switch-label" hidden><input id="show-points-balance" type="checkbox" /><span><strong>Ocultar pontos e saldo</strong><small>Remove essas informações do ranking e dos PDFs.</small></span></label>');
 const tieBreakVisibility = document.querySelector("#tie-break-visibility");
 const showPointsBalance = document.querySelector("#show-points-balance");
-function updateTieBreakVisibility() { tieBreakVisibility.hidden = tieBreakMode.value !== "wins"; }
+tieBreakVisibility.insertAdjacentHTML("afterend", '<label class="switch-label"><input id="quick-winner-only" type="checkbox" /><span><strong>Jogo por Resultado sem placar</strong><small>Solicita apenas o vencedor de cada partida. Usa somente vitórias no ranking e oculta pontos e saldo.</small></span></label>');
+const quickWinnerOnly = document.querySelector("#quick-winner-only");
+function updateTieBreakVisibility() {
+  tieBreakVisibility.hidden = tieBreakMode.value !== "wins";
+  if (quickWinnerOnly.checked) {
+    tieBreakMode.value = "wins";
+    showPointsBalance.checked = true;
+    tieBreakMode.disabled = true;
+    showPointsBalance.disabled = true;
+  } else {
+    tieBreakMode.disabled = false;
+    showPointsBalance.disabled = false;
+  }
+}
 
 if (configClient) {
   configClient.auth.getUser().then(({ data }) => {
@@ -31,6 +44,7 @@ if (configClient) {
     document.querySelector("#config-recovery-email").value = configUser.email || "";
     tieBreakMode.value = configUser.user_metadata?.tie_break_mode || localStorage.getItem("volley-tie-break-mode") || "full";
     showPointsBalance.checked = configUser.user_metadata?.show_points_balance === false;
+    quickWinnerOnly.checked = configUser.user_metadata?.quick_winner_only === true;
     updateTieBreakVisibility();
   });
 }
@@ -51,17 +65,19 @@ configForm.addEventListener("submit", async (event) => {
 tieBreakForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!configClient || !configUser) return;
-  const mode = tieBreakMode.value === "wins" ? "wins" : "full";
-  const visible = mode !== "wins" || !showPointsBalance.checked;
-  const { data, error } = await configClient.auth.updateUser({ data: { ...(configUser.user_metadata || {}), tie_break_mode: mode, show_points_balance: visible } });
+  const winnerOnly = quickWinnerOnly.checked;
+  const mode = winnerOnly || tieBreakMode.value === "wins" ? "wins" : "full";
+  const visible = winnerOnly ? false : mode !== "wins" || !showPointsBalance.checked;
+  const { data, error } = await configClient.auth.updateUser({ data: { ...(configUser.user_metadata || {}), tie_break_mode: mode, show_points_balance: visible, quick_winner_only: winnerOnly } });
   if (error) { tieBreakMessage.textContent = error.message; tieBreakMessage.className = "auth-message is-error"; return; }
   configUser = data.user;
   localStorage.setItem("volley-tie-break-mode", mode);
   localStorage.setItem("volley-show-points-balance", String(visible));
-  tieBreakMessage.textContent = mode === "wins" ? (visible ? "Critério salvo: pontos e saldo continuam visíveis." : "Critério salvo: pontos e saldo foram ocultados.") : "Critério salvo: vitórias, saldo e pontos.";
+  tieBreakMessage.textContent = winnerOnly ? "Modo sem placar salvo: informe apenas o vencedor de cada partida." : mode === "wins" ? (visible ? "Critério salvo: pontos e saldo continuam visíveis." : "Critério salvo: pontos e saldo foram ocultados.") : "Critério salvo: vitórias, saldo e pontos.";
   tieBreakMessage.className = "auth-message is-success";
 });
 tieBreakMode.addEventListener("change", updateTieBreakVisibility);
+quickWinnerOnly.addEventListener("change", updateTieBreakVisibility);
 
 configRecoveryForm.addEventListener("submit", async (event) => {
   event.preventDefault();
