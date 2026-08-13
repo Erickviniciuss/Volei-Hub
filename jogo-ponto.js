@@ -21,6 +21,9 @@ let pointCurrentPlayerCount = Number(pointPlayerCount.value);
 let pointShareCode = "";
 let pointStartedAt = "";
 let pointRetroEditingUnlocked = false;
+let pointTieBreakMode = localStorage.getItem("volley-tie-break-mode") === "wins" ? "wins" : "full";
+let pointShowPointsBalance = localStorage.getItem("volley-show-points-balance") !== "false";
+let finishedPointResult = null;
 
 function escapePoint(value) { return String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#039;", '"': "&quot;" })[char]); }
 function maxPointRounds(total) { return total % 2 === 0 ? total - 1 : total; }
@@ -29,7 +32,7 @@ function pointKey(round, match) { return `${round}-${match}`; }
 function generatePointShareCode() { const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; const values = crypto.getRandomValues(new Uint8Array(8)); return `VH-${[...values].map((value) => alphabet[value % alphabet.length]).join("")}`; }
 function savePointGame() {
   if (!pointSchedule.length || !pointShareCode) return;
-  const game = { status: "active", started: true, gameType: "points", shareCode: pointShareCode, startedAt: pointStartedAt, schedule: pointSchedule, currentRound: pointRound, pointMatch, scores: [...pointScores.entries()], pointHistory: [...pointHistory.entries()], teams: pointTeams, playerCount: pointCurrentPlayerCount, players: pointRoster, allowNoNames: pointRequireNames.checked };
+  const game = { status: "active", started: true, gameType: "points", tieBreakMode: pointTieBreakMode, shareCode: pointShareCode, startedAt: pointStartedAt, schedule: pointSchedule, currentRound: pointRound, pointMatch, scores: [...pointScores.entries()], pointHistory: [...pointHistory.entries()], teams: pointTeams, playerCount: pointCurrentPlayerCount, players: pointRoster, allowNoNames: pointRequireNames.checked };
   window.quickGameStore.saveActive(game);
   window.quickGameStore.saveLiveGame(game).then(({ error }) => { const status = document.querySelector("#point-share-code-status"); status.textContent = error ? "Não foi possível publicar o acompanhamento." : "Acompanhamento ativo."; }).catch(() => { const status = document.querySelector("#point-share-code-status"); status.textContent = "Não foi possível publicar o acompanhamento."; });
 }
@@ -119,7 +122,7 @@ function getPointStandings() {
     if (score.home > score.away) { h.wins += 1; a.losses += 1; } else { a.wins += 1; h.losses += 1; }
   });
   standings.forEach((team) => { team.difference = team.points - team.conceded; });
-  return standings.sort((a, b) => b.wins - a.wins || b.difference - a.difference || b.points - a.points);
+  return standings.sort((a, b) => b.wins - a.wins || (pointTieBreakMode === "full" ? b.difference - a.difference || b.points - a.points : 0) || a.name.localeCompare(b.name));
 }
 function renderPointRanking() { document.querySelector("#point-ranking").innerHTML = getPointStandings().map((team, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong><span>${escapePoint(team.name)}</span><small class="ranking-stats"><span><b>Vit.</b>${team.wins}</span><span><b>Der.</b>${team.losses}</span><span><b>Jogos</b>${team.games}</span><span><b>Pontos</b>${team.points}</span><span><b>Saldo</b>${team.difference >= 0 ? "+" : ""}${team.difference}</span></small></div>`).join(""); }
 function historyItems(key) {
@@ -167,7 +170,8 @@ function pointTeamDropdown(team, isAway = false) {
 }
 
 function renderPointRanking() {
-  document.querySelector("#point-ranking").innerHTML = getPointStandings().map((team, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong>${pointTeamDropdown(team.name)}<small class="ranking-stats"><span><b>Vit.</b>${team.wins}</span><span><b>Der.</b>${team.losses}</span><span><b>Jogos</b>${team.games}</span><span><b>Pontos</b>${team.points}</span><span><b>Saldo</b>${team.difference >= 0 ? "+" : ""}${team.difference}</span></small></div>`).join("");
+  const standings = getPointStandings(); const bestWins = Math.max(...standings.map((team) => team.wins));
+  document.querySelector("#point-ranking").innerHTML = standings.map((team, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong>${team.wins > 0 && team.wins === bestWins ? '<span class="leader-crown" title="Líder">♛</span>' : ""}${pointTeamDropdown(team.name)}<small class="ranking-stats"><span><b>Vit.</b>${team.wins}</span><span><b>Der.</b>${team.losses}</span><span><b>Jogos</b>${team.games}</span><span><b>Pontos</b>${team.points}</span><span><b>Saldo</b>${team.difference >= 0 ? "+" : ""}${team.difference}</span></small></div>`).join("");
 }
 
 function renderPointMatch() {
@@ -210,9 +214,66 @@ function advancePointMatch() {
   renderPointMatch(); savePointGame();
 }
 
+function recalculatePointHistory(key) {
+  const [roundIndex, matchIndex] = key.split("-").map(Number);
+  const [home, away] = pointSchedule[roundIndex].matches[matchIndex];
+  let homeScore = 0; let awayScore = 0;
+  const movements = (pointHistory.get(key) || []).map((movement) => {
+    const side = movement.team === away ? "away" : "home";
+    if (side === "home") homeScore += 1; else awayScore += 1;
+    return { ...movement, team: side === "home" ? home : away, side, homeScore, awayScore };
+  });
+  pointHistory.set(key, movements);
+  const previous = pointScores.get(key) || {};
+  const target = Number(pointsToWin.value);
+  pointScores.set(key, { home: homeScore, away: awayScore, finished: homeScore >= target || awayScore >= target, confirmed: Boolean(previous.confirmed) });
+}
+
+function renderPointHistoryEditor() {
+  const list = document.querySelector("#point-history-editor-list");
+  list.innerHTML = pointSchedule.flatMap((round, roundIndex) => round.matches.map(([home, away], matchIndex) => {
+    const key = pointKey(roundIndex, matchIndex);
+    const movements = pointHistory.get(key) || [];
+    if (!movements.length) return "";
+    return `<section class="point-history-edit-match"><strong>Rodada ${roundIndex + 1}: ${escapePoint(home)} × ${escapePoint(away)}</strong>${movements.map((movement, movementIndex) => `<div class="point-history-edit-row" data-history-key="${key}" data-history-index="${movementIndex}"><span>${movementIndex + 1}º</span><select data-history-field="team"><option value="${escapePoint(home)}" ${movement.team === home ? "selected" : ""}>${escapePoint(home)}</option><option value="${escapePoint(away)}" ${movement.team === away ? "selected" : ""}>${escapePoint(away)}</option></select><input data-history-field="player" type="text" maxlength="40" value="${escapePoint(movement.player || "Outros")}" aria-label="Participante do lance ${movementIndex + 1}" /><button class="history-remove-button" type="button">Remover</button></div>`).join("")}</section>`;
+  })).join("") || "<p>Nenhum movimento foi registrado até o momento.</p>";
+}
+
+function renderPointHistoryEditor() {
+  const list = document.querySelector("#point-history-editor-list");
+  list.innerHTML = pointSchedule.flatMap((round, roundIndex) => round.matches.map(([home, away], matchIndex) => {
+    const key = pointKey(roundIndex, matchIndex); const movements = pointHistory.get(key) || [];
+    if (!movements.length) return "";
+    return `<section class="point-history-edit-match"><strong>Rodada ${roundIndex + 1}: ${escapePoint(home)} × ${escapePoint(away)}</strong>${movements.map((movement, movementIndex) => { const roster = pointRoster[pointTeams.indexOf(movement.team)] || []; const names = [...new Set([...roster, "Outros"])]; return `<div class="point-history-edit-row" data-history-key="${key}" data-history-index="${movementIndex}"><span>${movementIndex + 1}º</span><select data-history-field="team"><option value="${escapePoint(home)}" ${movement.team === home ? "selected" : ""}>${escapePoint(home)}</option><option value="${escapePoint(away)}" ${movement.team === away ? "selected" : ""}>${escapePoint(away)}</option></select><select data-history-field="player" aria-label="Participante do lance ${movementIndex + 1}">${names.map((name) => `<option value="${escapePoint(name)}" ${movement.player === name ? "selected" : ""}>${escapePoint(name)}</option>`).join("")}</select><button class="history-remove-button" type="button">Remover</button></div>`; }).join("")}</section>`;
+  })).join("") || "<p>Nenhum movimento foi registrado até o momento.</p>";
+}
+
+function savePointHistoryEditor() {
+  const grouped = new Map();
+  document.querySelectorAll(".point-history-edit-row").forEach((row) => {
+    const key = row.dataset.historyKey;
+    const index = Number(row.dataset.historyIndex);
+    const movements = grouped.get(key) || [...(pointHistory.get(key) || [])];
+    const movement = movements[index];
+    if (movement) {
+      movement.team = row.querySelector('[data-history-field="team"]').value;
+      movement.player = row.querySelector('[data-history-field="player"]').value || "Outros";
+    }
+    grouped.set(key, movements);
+  });
+  grouped.forEach((movements, key) => { pointHistory.set(key, movements); recalculatePointHistory(key); });
+  pointRetroEditingUnlocked = false;
+  document.querySelector("#point-history-editor").hidden = true;
+  document.querySelector("#point-retro-auth-panel").hidden = true;
+  document.querySelector("#point-retro-edit-toggle").textContent = "Ajustar jogos";
+  document.querySelector("#point-retro-password").value = "";
+  document.querySelector("#point-retro-edit-message").textContent = "";
+  renderPointMatch(); savePointGame();
+}
+
 function overviewRoster(team, key) { return selectedOverviewTeam === `${key}:${team}` ? `<div class="point-overview-roster"><strong>${escapePoint(team)}</strong><span>${(pointRoster[pointTeams.indexOf(team)] || []).map(escapePoint).join(", ") || "Nenhum participante cadastrado."}</span></div>` : ""; }
 function renderPointOverview() {
-  document.querySelector("#point-overview-rounds").innerHTML = pointSchedule.map((round, roundIndex) => `<article class="round overview-round ${roundIndex === pointRound ? "is-current" : ""}"><header class="round-title">Rodada ${roundIndex + 1}<span>${roundIndex === pointRound ? "ATUAL" : roundIndex < pointRound ? "CONCLUÍDA" : "AGUARDANDO"}</span></header>${round.matches.map(([home, away], matchIndex) => { const key = pointKey(roundIndex, matchIndex); const score = pointScores.get(key); const currentGame = roundIndex === pointRound && matchIndex === pointMatch; const history = !pointRequireNames.checked && selectedOverviewMatch === key ? `<div class="point-overview-history"><strong>Histórico de pontos</strong><div class="point-history">${historyItems(key)}</div></div>` : ""; return `<div class="match overview-match ${currentGame ? "is-current-match" : ""}" data-overview-match="${key}"><span class="point-overview-team" data-overview-team="${escapePoint(home)}">${escapePoint(home)}</span><span class="overview-score ${pointRequireNames.checked ? "" : "point-overview-score"}" ${pointRequireNames.checked ? "" : `data-overview-score="${key}" role="button" tabindex="0" aria-label="Ver histórico de pontos"`}>${score ? `${score.home} × ${score.away}` : "×"}</span><span class="team-away point-overview-team" data-overview-team="${escapePoint(away)}">${escapePoint(away)}</span></div>${overviewRoster(home, key)}${overviewRoster(away, key)}${history}`; }).join("")}${round.bye ? `<div class="bye">Folga: <strong>${escapePoint(round.bye)}</strong></div>` : ""}</article>`).join("");
+  document.querySelector("#point-overview-rounds").innerHTML = pointSchedule.map((round, roundIndex) => `<article class="round overview-round ${roundIndex === pointRound ? "is-current" : ""}"><header class="round-title">Rodada ${roundIndex + 1}<span>${roundIndex === pointRound ? "ATUAL" : roundIndex < pointRound ? "CONCLUÍDA" : "AGUARDANDO"}</span></header>${round.matches.map(([home, away], matchIndex) => { const key = pointKey(roundIndex, matchIndex); const score = pointScores.get(key); const currentGame = roundIndex === pointRound && matchIndex === pointMatch; const history = !pointRequireNames.checked && selectedOverviewMatch === key ? `<div class="point-overview-history"><strong>Histórico de pontos</strong><div class="point-history">${historyItems(key)}</div></div>` : ""; return `<div class="match overview-match ${currentGame ? "is-current-match" : ""}" data-overview-match="${key}"><span class="point-overview-team" data-overview-team="${escapePoint(home)}">${escapePoint(home)}</span><span class="overview-score ${pointRequireNames.checked ? "" : "point-overview-score"}" ${pointRequireNames.checked ? "" : `data-overview-score="${key}" role="button" tabindex="0" aria-label="Ver histórico de pontos"`}>${score ? `${score.home} × ${score.away}` : "×"}</span><span class="team-away point-overview-team" data-overview-team="${escapePoint(away)}">${escapePoint(away)}</span></div>${overviewRoster(home, key)}${overviewRoster(away, key)}${history}`; }).join("")}${round.bye ? `<div class="bye">Folga: ${pointTeamDropdown(round.bye)}</div>` : ""}</article>`).join("");
 }
 
 function renderPointRetroInputs() {
@@ -239,9 +300,9 @@ async function unlockPointRetroEditing() {
   if (error) { message.textContent = "Senha incorreta."; return; }
   pointRetroEditingUnlocked = true;
   document.querySelector("#point-retro-auth-panel").hidden = true;
-  document.querySelector("#point-save-retro-scores").hidden = false;
+  document.querySelector("#point-history-editor").hidden = false;
   document.querySelector("#point-retro-edit-toggle").textContent = "Ajustes liberados";
-  renderPointOverview(); renderPointRetroInputs();
+  renderPointHistoryEditor();
 }
 function savePointRetroScores() {
   const inputs = [...document.querySelectorAll("#point-overview-rounds input[data-point-retro-round]")];
@@ -353,10 +414,22 @@ function renderPointFinishedHistory() {
   })).join("");
   document.querySelector("#point-finished-history").innerHTML = `<h3>Histórico de movimentos</h3>${sections || "<p>Nenhum ponto registrado.</p>"}`;
 }
+async function refreshPointTieBreakMode() {
+  const client = window.quickGameStore.getCloudClient();
+  if (!client) return;
+  const { data } = await client.auth.getUser();
+  pointTieBreakMode = data.user?.user_metadata?.tie_break_mode === "wins" ? "wins" : "full";
+  pointShowPointsBalance = pointTieBreakMode !== "wins" || data.user?.user_metadata?.show_points_balance !== false;
+  localStorage.setItem("volley-tie-break-mode", pointTieBreakMode);
+  localStorage.setItem("volley-show-points-balance", String(pointShowPointsBalance));
+  document.body.classList.toggle("hide-team-points-balance", !pointShowPointsBalance);
+}
 async function finishPointGame(message) {
   const standings = getPointStandings();
   const playerStandings = pointPlayerStandings();
-  const result = { id: Date.now(), gameType: "points", startedAt: pointStartedAt, finishedAt: new Date().toISOString(), reason: message, standings, playerStandings, schedule: pointSchedule, scores: [...pointScores.entries()].map(([key, score]) => [key, [String(score.home), String(score.away)]]), teams: pointTeams, players: pointRoster, playerCount: pointCurrentPlayerCount, pointHistory: [...pointHistory.entries()] };
+  const result = { id: Date.now(), gameType: "points", tieBreakMode: pointTieBreakMode, startedAt: pointStartedAt, finishedAt: new Date().toISOString(), reason: message, standings, playerStandings, schedule: pointSchedule, scores: [...pointScores.entries()].map(([key, score]) => [key, [String(score.home), String(score.away)]]), teams: pointTeams, players: pointRoster, playerCount: pointCurrentPlayerCount, pointHistory: [...pointHistory.entries()] };
+  result.showPointsBalance = pointShowPointsBalance;
+  finishedPointResult = result;
   window.quickGameStore.addResult(result);
   const { error } = await window.quickGameStore.saveResultToCloud(result);
   if (error) console.warn("Não foi possível salvar o resultado no Supabase.", error);
@@ -372,6 +445,68 @@ async function finishPointGame(message) {
   document.querySelector("#point-finished-history").hidden = true;
   document.querySelector("#point-finished-history-toggle").setAttribute("aria-expanded", "false");
   document.querySelector("#point-finished-history-toggle").textContent = "Ver histórico de movimentos";
+}
+
+function printFinishedPointResultLegacy() {
+  const result = finishedPointResult;
+  if (!result) return;
+  const scores = new Map(result.scores || []);
+  const rows = result.standings.map((team, index) => `<tr><td>${index + 1}º</td><td>${escapePoint(team.name)}</td><td>${team.games}</td><td>${team.wins}</td><td>${team.losses}</td><td>${team.points}</td><td>${team.difference >= 0 ? "+" : ""}${team.difference}</td></tr>`).join("");
+  const players = (result.playerStandings || []).slice(0, 10).map((player, index) => `<li>${index + 1}º ${escapePoint(player.name)} · ${escapePoint(player.team)} · ${player.points} pontos</li>`).join("");
+  const rounds = result.schedule.map((round, index) => `<section><h2>Rodada ${index + 1}</h2>${round.matches.map(([home, away], gameIndex) => { const score = scores.get(pointKey(index, gameIndex)); return `<p>${escapePoint(home)} <b>${score?.[0] ?? "—"} × ${score?.[1] ?? "—"}</b> ${escapePoint(away)}</p>`; }).join("")}${round.bye ? `<p>Folga: ${escapePoint(round.bye)}</p>` : ""}</section>`).join("");
+  const report = window.open("", "_blank"); if (!report) return;
+  report.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Volei Hub - Resultado</title><style>body{font-family:Arial;color:#1e293b;margin:32px}table{width:100%;border-collapse:collapse}th,td{padding:8px;border:1px solid #cbd5e1;text-align:left}th{background:#1f2937;color:#fff}section{margin-top:16px;padding:12px;border:1px solid #cbd5e1;border-radius:8px;break-inside:avoid}</style></head><body><h1>VÔLEI HUB</h1><h2>Resultado de partida</h2><p>${escapePoint(result.reason)}</p><h2>Classificação final</h2><table><thead><tr><th>#</th><th>Equipe</th><th>Jogos</th><th>Vit.</th><th>Der.</th><th>Pontos</th><th>Saldo</th></tr></thead><tbody>${rows}</tbody></table><h2>Top 10 jogadores</h2><ol>${players || "<li>Nenhum ponto individual registrado.</li>"}</ol><h2>Jogos por rodada</h2>${rounds}</body></html>`); report.document.close(); window.setTimeout(() => { report.focus(); report.print(); }, 300);
+}
+
+async function printFinishedPointResult() {
+  const result = finishedPointResult;
+  if (!result) return;
+  const Pdf = window.jspdf?.jsPDF;
+  if (!Pdf) { window.alert("Não foi possível preparar o PDF. Tente novamente."); return; }
+  const scores = new Map(result.scores || []);
+  const playedRounds = (result.schedule || []).map((round, index) => ({ round, index })).filter(({ round, index }) => round.matches.some((_, gameIndex) => {
+    const score = scores.get(pointKey(index, gameIndex));
+    return Array.isArray(score) && score[0] !== "" && score[1] !== "" && score[0] != null && score[1] != null;
+  }));
+  const showPointsBalance = result.showPointsBalance !== false;
+  const pdf = new Pdf({ unit: "mm", format: "a4" }); let y = 18;
+  const line = (text, size = 10, bold = false) => {
+    pdf.setFont("helvetica", bold ? "bold" : "normal"); pdf.setFontSize(size); pdf.setTextColor(30, 41, 59);
+    const lines = pdf.splitTextToSize(String(text), 175);
+    if (y + lines.length * 6 > 280) { pdf.addPage(); y = 18; }
+    pdf.text(lines, 18, y); y += lines.length * 6;
+  };
+  const columns = showPointsBalance ? [10, 62, 18, 18, 18, 24, 24] : [10, 78, 22, 22, 22];
+  const headers = showPointsBalance ? ["#", "Equipe", "Jogos", "Vit.", "Der.", "Pontos", "Saldo"] : ["#", "Equipe", "Jogos", "Vit.", "Der."];
+  const tableRow = (cells, header = false) => {
+    if (y + 8 > 280) { pdf.addPage(); y = 18; }
+    let x = 18;
+    cells.forEach((cell, index) => {
+      pdf.setDrawColor(190, 200, 210); pdf.setFillColor(header ? 30 : 255, header ? 41 : 255, header ? 59 : 255);
+      pdf.rect(x, y, columns[index], 8, "FD"); pdf.setTextColor(header ? 255 : 30, header ? 255 : 41, header ? 255 : 59);
+      pdf.setFont("helvetica", header ? "bold" : "normal"); pdf.setFontSize(8);
+      const text = pdf.splitTextToSize(String(cell), columns[index] - 3)[0] || "";
+      pdf.text(text, index === 1 ? x + 1.5 : x + columns[index] / 2, y + 5.2, { align: index === 1 ? "left" : "center" }); x += columns[index];
+    }); y += 8;
+  };
+  line("VÔLEI HUB", 12, true); line("Resultado de partida", 20, true); line(result.reason); y += 3;
+  line("Classificação final", 15, true); tableRow(headers, true);
+  result.standings.forEach((team, index) => tableRow(showPointsBalance ? [`${index + 1}º`, team.name, team.games, team.wins, team.losses, team.points, `${team.difference >= 0 ? "+" : ""}${team.difference}`] : [`${index + 1}º`, team.name, team.games, team.wins, team.losses]));
+  const players = result.playerStandings || [];
+  if (players.length) { y += 8; line("Top 10 jogadores", 15, true); players.slice(0, 10).forEach((player, index) => line(`${index + 1}º ${player.name} · ${player.team} · ${player.points} pontos`)); }
+  y += 8; line("Jogos por rodada", 15, true);
+  playedRounds.forEach(({ round, index }) => {
+    line(`Rodada ${index + 1}`, 13, true);
+    round.matches.forEach(([home, away], gameIndex) => { const score = scores.get(pointKey(index, gameIndex)); if (score?.[0] !== "" && score?.[1] !== "" && score?.[0] != null && score?.[1] != null) line(`${home}    ${score[0]} × ${score[1]}    ${away}`); });
+    if (round.bye) line(`Folga: ${round.bye}`, 9); y += 3;
+  });
+  const filename = pointPdfFileName(result.startedAt || result.finishedAt);
+  const file = new File([pdf.output("blob")], filename, { type: "application/pdf" });
+  if (navigator.canShare?.({ files: [file] })) {
+    try { await navigator.share({ title: "Resultado - Vôlei Hub", text: "Resultado da partida.", files: [file] }); return; }
+    catch (error) { if (error.name === "AbortError") return; }
+  }
+  pdf.save(filename);
 }
 
 function openScorerDialog(team) {
@@ -395,6 +530,7 @@ pointPlayerCount.addEventListener("change", makePointPlayerInputs);
 pointUnlimited.addEventListener("change", makePointInputs);
 pointTeamNames.addEventListener("change", makePointPlayerInputs);
 document.querySelector("#point-start").addEventListener("click", async () => {
+  await refreshPointTieBreakMode();
   if (!readPointSetup()) {
     document.querySelector("#point-setup-message").textContent = "Informe pelo menos um participante em cada time ou ative a opção para iniciar sem nomes.";
     document.querySelector("#point-setup-message").className = "auth-message is-error";
@@ -434,18 +570,40 @@ document.querySelector("#point-scorer-continue").addEventListener("click", () =>
 });
 document.querySelector("#point-scorer-close").addEventListener("click", closeScorerDialog);
 document.querySelector("#point-scorer-dialog").addEventListener("cancel", () => { selectedPointTeam = ""; selectedPointPlayer = ""; });
-document.querySelector("#point-show-rounds").addEventListener("click", () => { renderPointOverview(); if (pointRetroEditingUnlocked) renderPointRetroInputs(); document.querySelector("#point-overview").hidden = false; document.querySelector("#point-overview").scrollIntoView({ behavior: "smooth" }); });
+document.querySelector("#point-show-rounds").addEventListener("click", () => { if (!pointRetroEditingUnlocked) document.querySelector("#point-history-editor").hidden = true; renderPointOverview(); document.querySelector("#point-overview").hidden = false; document.querySelector("#point-overview").scrollIntoView({ behavior: "smooth" }); });
 document.querySelector("#point-print-game").addEventListener("click", printPointGamePdf);
+document.querySelector("#point-finished-print-game").addEventListener("click", printFinishedPointResult);
 document.querySelector("#point-adjust-game").addEventListener("click", openLivePointSettings);
 document.querySelector("#point-live-team-count").addEventListener("change", makeLivePointTeamInputs);
 document.querySelector("#point-live-player-count").addEventListener("change", makeLivePointPlayerInputs);
 document.querySelector("#point-live-team-names").addEventListener("change", makeLivePointPlayerInputs);
 document.querySelector("#point-live-players-toggle").addEventListener("click", () => { const panel = document.querySelector("#point-live-players"); panel.hidden = !panel.hidden; const open = !panel.hidden; document.querySelector("#point-live-players-toggle").setAttribute("aria-expanded", String(open)); document.querySelector("#point-live-players-toggle").textContent = open ? "Ocultar participantes" : "Editar participantes"; });
 document.querySelector("#point-apply-live-settings").addEventListener("click", applyLivePointSettings);
-document.querySelector("#point-retro-edit-toggle").addEventListener("click", () => { if (pointRetroEditingUnlocked) return; const panel = document.querySelector("#point-retro-auth-panel"); panel.hidden = !panel.hidden; if (!panel.hidden) document.querySelector("#point-retro-password").focus(); });
+document.querySelector("#point-history-editor-list").addEventListener("click", (event) => {
+  const remove = event.target.closest(".history-remove-button");
+  if (!remove) return;
+  const row = remove.closest(".point-history-edit-row");
+  const key = row.dataset.historyKey; const index = Number(row.dataset.historyIndex);
+  const movements = [...(pointHistory.get(key) || [])];
+  movements.splice(index, 1);
+  pointHistory.set(key, movements);
+  recalculatePointHistory(key);
+  renderPointHistoryEditor(); renderPointMatch(); savePointGame();
+});
+document.querySelector("#point-history-editor-list").addEventListener("change", (event) => {
+  if (!event.target.matches('[data-history-field="team"]')) return;
+  const row = event.target.closest(".point-history-edit-row");
+  const movements = pointHistory.get(row.dataset.historyKey) || [];
+  const movement = movements[Number(row.dataset.historyIndex)];
+  if (!movement) return;
+  movement.team = event.target.value;
+  movement.player = (pointRoster[pointTeams.indexOf(movement.team)] || [])[0] || "Outros";
+  renderPointHistoryEditor();
+});
+document.querySelector("#point-save-history-editor").addEventListener("click", savePointHistoryEditor);
+document.querySelector("#point-retro-edit-toggle").addEventListener("click", () => { if (pointRetroEditingUnlocked) return; const panel = document.querySelector("#point-retro-auth-panel"); panel.hidden = !panel.hidden; document.querySelector("#point-history-editor").hidden = true; if (!panel.hidden) document.querySelector("#point-retro-password").focus(); });
 document.querySelector("#point-unlock-retro-edit").addEventListener("click", unlockPointRetroEditing);
-document.querySelector("#point-save-retro-scores").addEventListener("click", savePointRetroScores);
-document.querySelector("#point-close-overview").addEventListener("click", () => { document.querySelector("#point-overview").hidden = true; pointRetroEditingUnlocked = false; document.querySelector("#point-retro-auth-panel").hidden = true; document.querySelector("#point-save-retro-scores").hidden = true; document.querySelector("#point-retro-edit-toggle").textContent = "Ajustar jogos"; document.querySelector("#point-retro-password").value = ""; document.querySelector("#point-retro-edit-message").textContent = ""; });
+document.querySelector("#point-close-overview").addEventListener("click", () => { document.querySelector("#point-overview").hidden = true; pointRetroEditingUnlocked = false; document.querySelector("#point-retro-auth-panel").hidden = true; document.querySelector("#point-history-editor").hidden = true; document.querySelector("#point-retro-edit-toggle").textContent = "Ajustar jogos"; document.querySelector("#point-retro-password").value = ""; document.querySelector("#point-retro-edit-message").textContent = ""; });
 document.querySelector("#point-overview-rounds").addEventListener("click", (event) => {
   const team = event.target.closest(".point-overview-team");
   const score = event.target.closest(".point-overview-score");
@@ -489,6 +647,7 @@ function restorePointGame(game) {
   pointCurrentPlayerCount = Number(game.playerCount) || 4;
   pointShareCode = game.shareCode || generatePointShareCode();
   pointStartedAt = game.startedAt || new Date().toISOString();
+  pointTieBreakMode = game.tieBreakMode || pointTieBreakMode;
   pointRequireNames.checked = Boolean(game.allowNoNames);
   pointScores.clear(); (game.scores || []).forEach(([key, score]) => { const [roundIndex, matchIndex] = key.split("-").map(Number); if (score.finished && score.confirmed === undefined) score.confirmed = roundIndex < pointRound || (roundIndex === pointRound && matchIndex < pointMatch); pointScores.set(key, score); });
   pointHistory.clear(); (game.pointHistory || []).forEach(([key, history]) => pointHistory.set(key, history));

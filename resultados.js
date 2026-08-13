@@ -32,6 +32,14 @@ function scoreFor(result, roundIndex, gameIndex) {
   if (!score) return "—";
   return Array.isArray(score) && score[0] !== "" && score[1] !== "" ? `${score[0]} × ${score[1]}` : !Array.isArray(score) ? `${score.home} × ${score.away}` : "—";
 }
+function resultRoundHasPlayedGame(result, roundIndex) {
+  const scoreMap = new Map(result.scores || []);
+  const round = result.schedule?.[roundIndex];
+  return Boolean(round?.matches.some((_, gameIndex) => {
+    const score = scoreMap.get(`${roundIndex}-${gameIndex}`);
+    return Array.isArray(score) && score[0] !== "" && score[1] !== "" && score[0] != null && score[1] != null;
+  }));
+}
 function resultVisualStats(result, team) {
   if (Number.isFinite(team.games) && Number.isFinite(team.losses)) return { games: team.games, losses: team.losses };
   let games = 0; let losses = 0;
@@ -46,7 +54,7 @@ function resultVisualStats(result, team) {
   }));
   return { games, losses };
 }
-function resultStats(team, result) { const visual = resultVisualStats(result, team); return `<small class="ranking-stats"><span><b>Vit.</b>${team.wins}</span><span><b>Der.</b>${visual.losses}</span><span><b>Jogos</b>${visual.games}</span><span><b>Pontos</b>${team.points}</span><span><b>Saldo</b>${team.difference >= 0 ? "+" : ""}${team.difference}</span></small>`; }
+function resultStats(team, result) { const visual = resultVisualStats(result, team); const show = result.showPointsBalance !== false; return `<small class="ranking-stats"><span><b>Vit.</b>${team.wins}</span><span><b>Der.</b>${visual.losses}</span><span><b>Jogos</b>${visual.games}</span>${show ? `<span><b>Pontos</b>${team.points}</span><span><b>Saldo</b>${team.difference >= 0 ? "+" : ""}${team.difference}</span>` : ""}</small>`; }
 
 function localDate(value) {
   const date = new Date(value);
@@ -70,13 +78,16 @@ function renderResults() {
     const date = new Date(result.finishedAt).toLocaleString("pt-BR");
     const topPlayer = resultGameType(result) === "points" ? pointPlayerRanking(result)[0] : null;
     const playerHighlight = topPlayer ? `<p class="result-top-player">Maior pontuador: <strong>${escapeResult(topPlayer.name)}</strong> · ${escapeResult(topPlayer.team)} · ${topPlayer.points} pontos</p>` : resultGameType(result) === "points" ? "<p class=\"result-top-player\">Nenhum ponto individual foi registrado.</p>" : "";
-    return `<article class="result-card"><div class="result-card-heading"><div><p class="eyebrow">${date}</p><span class="result-game-type ${resultGameType(result)}">${resultGameTypeLabel(result)}</span><h2>${escapeResult(result.reason)}</h2></div><div class="result-actions"><button class="print-result" type="button" data-id="${result.id}">Enviar PDF</button><button class="delete-result" type="button" data-id="${result.id}">Excluir</button></div></div><div class="result-ranking">${result.standings.map((team, index) => `<div><strong>${index + 1}º</strong><span class="result-team-name">${escapeResult(team.name)}</span>${resultStats(team, result)}</div>`).join("")}</div>${playerHighlight}</article>`;
+    const bestWins = Math.max(...result.standings.map((team) => team.wins));
+    return `<article class="result-card"><div class="result-card-heading"><div><p class="eyebrow">${date}</p><span class="result-game-type ${resultGameType(result)}">${resultGameTypeLabel(result)}</span><h2>${escapeResult(result.reason)}</h2></div><div class="result-actions"><button class="print-result" type="button" data-id="${result.id}">Enviar PDF</button><button class="delete-result" type="button" data-id="${result.id}">Excluir</button></div></div><div class="result-ranking">${result.standings.map((team, index) => `<div><strong>${index + 1}º</strong>${team.wins > 0 && team.wins === bestWins ? '<span class="leader-crown" title="Líder">♛</span>' : ""}<span class="result-team-name">${escapeResult(team.name)}</span>${resultStats(team, result)}</div>`).join("")}</div>${playerHighlight}</article>`;
   }).join("") + (visible.length < results.length ? `<button id="show-more-results" class="show-more-results" type="button">Mostrar mais</button>` : "");
 }
 
 async function printResult(result) {
+  const playedRoundIndexes = (result.schedule || []).map((_, roundIndex) => roundIndex).filter((roundIndex) => resultRoundHasPlayedGame(result, roundIndex));
+  const showPointsBalance = result.showPointsBalance !== false;
   if (!result.schedule) { window.alert("Este histórico foi salvo antes do relatório detalhado."); return; }
-  const rows = result.standings.map((team, index) => { const visual = resultVisualStats(result, team); return `<tr><td>${index + 1}º</td><td>${escapeResult(team.name)}</td><td>${visual.games}</td><td>${team.wins}</td><td>${visual.losses}</td><td>${team.points}</td><td>${team.difference >= 0 ? "+" : ""}${team.difference}</td></tr>`; }).join("");
+  const rows = result.standings.map((team, index) => { const visual = resultVisualStats(result, team); return `<tr><td>${index + 1}º</td><td>${escapeResult(team.name)}</td><td>${visual.games}</td><td>${team.wins}</td><td>${visual.losses}</td>${showPointsBalance ? `<td>${team.points}</td><td>${team.difference >= 0 ? "+" : ""}${team.difference}</td>` : ""}</tr>`; }).join("");
   const teamNames = result.teams?.length ? result.teams : result.standings.map((team) => team.name);
   const totalPlayers = result.playerCount || Math.max(4, ...(result.players || []).map((players) => players.length));
   const topPlayers = resultGameType(result) === "points" ? pointPlayerRanking(result).slice(0, 10) : [];
@@ -114,8 +125,8 @@ async function printResult(result) {
     };
     line("VÔLEI HUB", 12, true); line("Resultado de partida", 20, true); line(result.reason); y += 3;
     line("Classificação final", 15, true);
-    const columns = [10, 62, 18, 18, 18, 24, 24];
-    const headers = ["#", "Equipe", "Jogos", "Vit.", "Der.", "Pontos", "Saldo"];
+    const columns = showPointsBalance ? [10, 62, 18, 18, 18, 24, 24] : [10, 78, 22, 22, 22];
+    const headers = showPointsBalance ? ["#", "Equipe", "Jogos", "Vit.", "Der.", "Pontos", "Saldo"] : ["#", "Equipe", "Jogos", "Vit.", "Der."];
     const drawRankingRow = (cells, header = false) => {
       const height = 8;
       if (y + height > 280) { pdf.addPage(); y = 18; }
@@ -138,7 +149,7 @@ async function printResult(result) {
     drawRankingRow(headers, true);
     result.standings.forEach((team, index) => {
       const visual = resultVisualStats(result, team);
-      drawRankingRow([`${index + 1}º`, team.name, visual.games, team.wins, visual.losses, team.points, `${team.difference >= 0 ? "+" : ""}${team.difference}`]);
+      drawRankingRow(showPointsBalance ? [`${index + 1}º`, team.name, visual.games, team.wins, visual.losses, team.points, `${team.difference >= 0 ? "+" : ""}${team.difference}`] : [`${index + 1}º`, team.name, visual.games, team.wins, visual.losses]);
     });
     pdf.setTextColor(30, 41, 59);
     if (topPlayers.length) {
@@ -151,7 +162,8 @@ async function printResult(result) {
       line(`${team}: ${names.join(", ")}`);
     });
     y += 3; line("Jogos por rodada", 15, true);
-    result.schedule.forEach((round, roundIndex) => {
+    playedRoundIndexes.forEach((roundIndex) => {
+      const round = result.schedule[roundIndex];
       line(`Rodada ${roundIndex + 1}`, 13, true);
       round.matches.forEach(([home, away], gameIndex) => {
         line(`${home}    ${scoreFor(result, roundIndex, gameIndex)}    ${away}`);

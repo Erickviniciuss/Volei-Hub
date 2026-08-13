@@ -55,7 +55,7 @@ function standingsFor(game) {
     if (homePoints > awayPoints) { homeTeam.wins += 1; awayTeam.losses += 1; }
     if (awayPoints > homePoints) { awayTeam.wins += 1; homeTeam.losses += 1; }
   }));
-  return standings.map((team) => ({ ...team, difference: team.points - team.conceded })).sort((a, b) => b.wins - a.wins || b.difference - a.difference || b.points - a.points || a.name.localeCompare(b.name));
+  return standings.map((team) => ({ ...team, difference: team.points - team.conceded })).sort((a, b) => b.wins - a.wins || (game.tieBreakMode !== "wins" ? b.difference - a.difference || b.points - a.points : 0) || a.name.localeCompare(b.name));
 }
 
 function renderViewer(game) {
@@ -63,10 +63,11 @@ function renderViewer(game) {
   document.querySelector("#viewer-print-pdf").hidden = !finished;
   viewerCode.textContent = `Código: ${liveCode}`;
   viewerStatus.textContent = `Atualizado às ${new Date(game.updatedAt || Date.now()).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}.`;
-  document.querySelector("#viewer-ranking").innerHTML = standingsFor(game).map((team, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong><span>${escapeViewer(team.name)}</span>${viewerStats(team)}</div>`).join("");
+  const standings = standingsFor(game); const bestWins = Math.max(...standings.map((team) => team.wins));
+  document.querySelector("#viewer-ranking").innerHTML = standings.map((team, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong>${team.wins > 0 && team.wins === bestWins ? '<span class="leader-crown" title="Líder">♛</span>' : ""}<span>${escapeViewer(team.name)}</span>${viewerStats(team)}</div>`).join("");
   const scores = new Map(game.scores || []);
   const currentGame = Number(game.gameType === "points" ? game.pointMatch : game.confirmedGameCount) || 0;
-  document.querySelector("#viewer-rounds").innerHTML = game.schedule.map((round, roundIndex) => `<article class="round overview-round ${roundIndex === game.currentRound ? "is-current" : ""}"><header class="round-title">Rodada ${roundIndex + 1}<span>${roundIndex === game.currentRound ? "ATUAL" : roundIndex < game.currentRound ? "CONCLUÍDA" : "AGUARDANDO"}</span></header>${round.matches.map(([home, away], gameIndex) => { const score = scores.get(scoreKeyViewer(roundIndex, gameIndex)); const value = score ? (Array.isArray(score) ? `${score[0]} × ${score[1]}` : `${score.home} × ${score.away}`) : "×"; return `<div class="match overview-match ${roundIndex === game.currentRound && gameIndex === currentGame ? "is-current-match" : ""}">${viewerTeamDropdown(game, home)}<span class="overview-score">${value}</span>${viewerTeamDropdown(game, away, true)}</div>`; }).join("")}${round.bye ? `<div class="bye">Folga: <strong>${escapeViewer(round.bye)}</strong></div>` : ""}</article>`).join("");
+  document.querySelector("#viewer-rounds").innerHTML = game.schedule.map((round, roundIndex) => `<article class="round overview-round ${roundIndex === game.currentRound ? "is-current" : ""}"><header class="round-title">Rodada ${roundIndex + 1}<span>${roundIndex === game.currentRound ? "ATUAL" : roundIndex < game.currentRound ? "CONCLUÍDA" : "AGUARDANDO"}</span></header>${round.matches.map(([home, away], gameIndex) => { const score = scores.get(scoreKeyViewer(roundIndex, gameIndex)); const value = score ? (Array.isArray(score) ? `${score[0]} × ${score[1]}` : `${score.home} × ${score.away}`) : "×"; return `<div class="match overview-match ${roundIndex === game.currentRound && gameIndex === currentGame ? "is-current-match" : ""}">${viewerTeamDropdown(game, home)}<span class="overview-score">${value}</span>${viewerTeamDropdown(game, away, true)}</div>`; }).join("")}${round.bye ? `<div class="bye">Folga: ${viewerTeamDropdown(game, round.bye)}</div>` : ""}</article>`).join("");
   if (finished) viewerStatus.textContent = game.reason || "Este jogo foi encerrado.";
   viewerGame = game;
   const playerSection = document.querySelector("#viewer-player-ranking-section");
