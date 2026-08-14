@@ -30,6 +30,25 @@ function maxPointRounds(total) { return total % 2 === 0 ? total - 1 : total; }
 function normalizePointRounds(value, total, unlimited) { const max = maxPointRounds(total); const requested = Math.max(1, Number(value) || 1); return unlimited ? requested : Math.max(max, Math.round(requested / max) * max); }
 function pointKey(round, match) { return `${round}-${match}`; }
 function generatePointShareCode() { const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; const values = crypto.getRandomValues(new Uint8Array(8)); return `VH-${[...values].map((value) => alphabet[value % alphabet.length]).join("")}`; }
+async function copyPointGroups() {
+  const teams = pointTeams.length ? pointTeams : [...document.querySelectorAll(".point-team-name")].map((input, index) => input.value.trim() || `Equipe ${index + 1}`);
+  const roster = pointRoster.length ? pointRoster : teams.map((_, teamIndex) => [...document.querySelectorAll(`.point-player-name[data-team="${teamIndex}"]`)].map((input) => input.value.trim()).filter(Boolean));
+  const gameDate = pointStartedAt ? new Date(pointStartedAt).toLocaleString("pt-BR") : new Date().toLocaleString("pt-BR");
+  const text = `VÔLEI HUB · GRUPOS\n\n${teams.map((team, index) => {
+    const players = roster[index]?.length ? roster[index] : ["Vazio"];
+    return `${team}\n${players.map((person) => `• ${person}`).join("\n")}`;
+  }).join("\n\n")}\n\nData do jogo: ${gameDate}`;
+  const button = document.querySelector("#copy-point-groups");
+  try {
+    await navigator.clipboard.writeText(text);
+    button.textContent = "Grupos copiados";
+  } catch {
+    const area = document.createElement("textarea"); area.value = text; area.style.position = "fixed"; area.style.opacity = "0";
+    document.body.append(area); area.select(); document.execCommand("copy"); area.remove();
+    button.textContent = "Grupos copiados";
+  }
+  window.setTimeout(() => { button.textContent = "Copiar grupos"; }, 1800);
+}
 function savePointGame() {
   if (!pointSchedule.length || !pointShareCode) return;
   const game = { status: "active", started: true, gameType: "points", tieBreakMode: pointTieBreakMode, shareCode: pointShareCode, startedAt: pointStartedAt, schedule: pointSchedule, currentRound: pointRound, pointMatch, scores: [...pointScores.entries()], pointHistory: [...pointHistory.entries()], teams: pointTeams, playerCount: pointCurrentPlayerCount, players: pointRoster, allowNoNames: pointRequireNames.checked };
@@ -573,6 +592,7 @@ document.querySelector("#point-scorer-dialog").addEventListener("cancel", () => 
 document.querySelector("#point-show-rounds").addEventListener("click", () => { if (!pointRetroEditingUnlocked) document.querySelector("#point-history-editor").hidden = true; renderPointOverview(); document.querySelector("#point-overview").hidden = false; document.querySelector("#point-overview").scrollIntoView({ behavior: "smooth" }); });
 document.querySelector("#point-print-game").addEventListener("click", printPointGamePdf);
 document.querySelector("#point-finished-print-game").addEventListener("click", printFinishedPointResult);
+document.querySelector("#copy-point-groups").addEventListener("click", copyPointGroups);
 document.querySelector("#point-adjust-game").addEventListener("click", openLivePointSettings);
 document.querySelector("#point-live-team-count").addEventListener("change", makeLivePointTeamInputs);
 document.querySelector("#point-live-player-count").addEventListener("change", makeLivePointPlayerInputs);

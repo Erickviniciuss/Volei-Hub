@@ -52,6 +52,26 @@ function gamePdfFileName(date = new Date()) {
   return `Volei Hub - ${pad(value.getDate())}-${pad(value.getMonth() + 1)}-${value.getFullYear()} ${pad(value.getHours())}h${pad(value.getMinutes())}.pdf`;
 }
 
+async function copyQuickGroups() {
+  const teams = currentTeams.length ? currentTeams : [...document.querySelectorAll(".quick-team-name")].map((input, index) => input.value.trim() || `Equipe ${index + 1}`);
+  const players = currentPlayers.length ? currentPlayers : getQuickPlayers();
+  const gameDate = gameStartedAt ? new Date(gameStartedAt).toLocaleString("pt-BR") : new Date().toLocaleString("pt-BR");
+  const text = `VÔLEI HUB · GRUPOS\n\n${teams.map((team, index) => {
+    const roster = players[index]?.length ? players[index] : ["Vazio"];
+    return `${team}\n${roster.map((person) => `• ${person}`).join("\n")}`;
+  }).join("\n\n")}\n\nData do jogo: ${gameDate}`;
+  const button = document.querySelector("#copy-quick-groups");
+  try {
+    await navigator.clipboard.writeText(text);
+    button.textContent = "Grupos copiados";
+  } catch {
+    const area = document.createElement("textarea"); area.value = text; area.style.position = "fixed"; area.style.opacity = "0";
+    document.body.append(area); area.select(); document.execCommand("copy"); area.remove();
+    button.textContent = "Grupos copiados";
+  }
+  window.setTimeout(() => { button.textContent = "Copiar grupos"; }, 1800);
+}
+
 function makeQuickTeamInputs() {
   const previous = [...document.querySelectorAll(".quick-team-name")].map((input) => input.value);
   const total = Number(quickTeamCount.value);
@@ -548,6 +568,7 @@ document.querySelector("#apply-live-settings").addEventListener("click", applyLi
 document.querySelector("#show-rounds").addEventListener("click", () => { renderOverview(); overview.hidden = false; overview.scrollIntoView({ behavior: "smooth", block: "start" }); });
 document.querySelector("#print-game").addEventListener("click", printQuickGamePdf);
 document.querySelector("#finished-print-game").addEventListener("click", printFinishedQuickResult);
+document.querySelector("#copy-quick-groups").addEventListener("click", copyQuickGroups);
 document.querySelector("#retro-edit-toggle").addEventListener("click", () => {
   if (retroEditingUnlocked) return;
   const panel = document.querySelector("#retro-auth-panel");
