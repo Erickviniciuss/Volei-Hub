@@ -9,7 +9,7 @@ const generatorMessage = document.querySelector("#generator-message");
 const generatedTeams = document.querySelector("#generated-teams");
 const idealTeamCount = document.querySelector("#ideal-team-count");
 let lastDraw = null;
-let participantDraft = [{ name: "", seed: false }];
+let participantDraft = [{ name: "", seedLevel: 0 }];
 
 function escapeGenerator(value) { return String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#039;", '"': "&quot;" })[character]); }
 function shuffle(items) {
@@ -35,8 +35,13 @@ function updateTeamInformation() {
   idealTeamCount.innerHTML = `Quantidade ideal pela configuração atual: <strong>${ideal} ${ideal === 1 ? "time" : "times"}</strong>. Você pode escolher outra quantidade para o sorteio.`;
 }
 
-function selectedSeedCount() {
-  return participantDraft.filter((person) => person.seed).length;
+function nextSeedLevel() {
+  const perTeam = Math.max(1, Number(seedsPerTeam.value) || 1);
+  const teams = getTeamCount() || 1;
+  for (let level = 1; level <= perTeam; level += 1) {
+    if (participantDraft.filter((person) => person.seedLevel === level).length < teams) return level;
+  }
+  return 0;
 }
 
 function saveParticipantDraftFromInputs() {
@@ -44,8 +49,29 @@ function saveParticipantDraftFromInputs() {
   if (!fields.length) return;
   participantDraft = fields.map((field) => ({
     name: field.querySelector(".generator-person")?.value || "",
-    seed: Boolean(field.querySelector(".seed-check input")?.checked),
+    seedLevel: field.querySelector(".seed-check input")?.checked ? Number(field.querySelector(".seed-check input")?.dataset.seedLevel) || 1 : 0,
   }));
+}
+
+function renderPeopleInputsLegacy(syncInputs = true) {
+  if (syncInputs) saveParticipantDraftFromInputs();
+  const selectedSeedsPerTeam = Math.max(1, Number(seedsPerTeam.value) || 1);
+  peopleCount.value = participantDraft.length;
+  peoplePerTeam.value = Math.min(6, Math.max(1, Number(peoplePerTeam.value) || 1));
+  teamTotal.value = Math.min(7, Math.max(1, Number(teamTotal.value) || 1));
+  seedCountField.hidden = !seedEnabled.checked;
+  updateTeamInformation();
+  const capacity = getTeamCount() * Number(peoplePerTeam.value);
+  if (participantDraft.length > capacity) {
+    generatorMessage.textContent = `A configuração atual permite no máximo ${capacity} participantes.`;
+    generatorMessage.className = "auth-message is-error";
+  }
+  const nextLevel = seedEnabled.checked ? nextSeedLevel() : 0;
+  peopleNames.innerHTML = participantDraft.map((person, index) => {
+    const seedControl = person.seed ? '<span class="seed-check"><input type="checkbox" checked /> Cabeça de chave</span>' : maySelectSeed && seedEnabled.checked ? '<span class="seed-check"><input type="checkbox" /> Cabeça de chave</span>' : "";
+    return `<div class="generator-person-field"><label>Participante ${index + 1}<input class="generator-person" type="text" maxlength="40" value="${escapeGenerator(person.name || "")}" placeholder="Nome do participante" /></label>${seedControl ? `<label class="seed-check">${seedControl.replace('<span class="seed-check">', '').replace('</span>', '')}</label>` : ""}</div>`;
+  }).join("");
+  seedsPerTeam.innerHTML = Array.from({ length: Math.min(6, Number(peoplePerTeam.value)) }, (_, index) => `<option value="${index + 1}" ${selectedSeedsPerTeam === index + 1 ? "selected" : ""}>${index + 1} por time</option>`).join("");
 }
 
 function renderPeopleInputs(syncInputs = true) {
@@ -61,12 +87,11 @@ function renderPeopleInputs(syncInputs = true) {
     generatorMessage.textContent = `A configuração atual permite no máximo ${capacity} participantes.`;
     generatorMessage.className = "auth-message is-error";
   }
-  const seedLimit = getTeamCount() * selectedSeedsPerTeam;
-  const alreadySelected = selectedSeedCount();
-  const maySelectSeed = !seedEnabled.checked || alreadySelected < seedLimit;
+  const nextLevel = seedEnabled.checked ? nextSeedLevel() : 0;
   peopleNames.innerHTML = participantDraft.map((person, index) => {
-    const seedControl = person.seed ? '<span class="seed-check"><input type="checkbox" checked /> Cabeça de chave</span>' : maySelectSeed && seedEnabled.checked ? '<span class="seed-check"><input type="checkbox" /> Cabeça de chave</span>' : "";
-    return `<div class="generator-person-field"><label>Participante ${index + 1}<input class="generator-person" type="text" maxlength="40" value="${escapeGenerator(person.name || "")}" placeholder="Nome do participante" /></label>${seedControl ? `<label class="seed-check">${seedControl.replace('<span class="seed-check">', '').replace('</span>', '')}</label>` : ""}</div>`;
+    const level = person.seedLevel || nextLevel;
+    const seedControl = level ? `<label class="seed-check"><input type="checkbox" data-seed-level="${level}" ${person.seedLevel ? "checked" : ""} /> ${level}º cabeça de chave</label>` : "";
+    return `<div class="generator-person-field"><label>Participante ${index + 1}<input class="generator-person" type="text" maxlength="40" value="${escapeGenerator(person.name || "")}" placeholder="Nome do participante" /></label>${seedControl}</div>`;
   }).join("");
   seedsPerTeam.innerHTML = Array.from({ length: Math.min(6, Number(peoplePerTeam.value)) }, (_, index) => `<option value="${index + 1}" ${selectedSeedsPerTeam === index + 1 ? "selected" : ""}>${index + 1} por time</option>`).join("");
 }
@@ -81,7 +106,7 @@ function addGeneratorPerson() {
     return;
   }
   generatorMessage.textContent = "";
-  participantDraft.push({ name: "", seed: false });
+  participantDraft.push({ name: "", seedLevel: 0 });
   renderPeopleInputs(false);
 }
 
@@ -98,7 +123,7 @@ function removeGeneratorPerson() {
   renderPeopleInputs(false);
 }
 
-function renderGeneratedTeams(teams) {
+function renderGeneratedTeamsLegacy(teams) {
   generatedTeams.hidden = false;
   const capacity = Number(peoplePerTeam.value);
   generatedTeams.innerHTML = `<p class="eyebrow">RESULTADO DO SORTEIO</p><h2>Times definidos</h2><div class="generated-teams-grid">${teams.map((team, index) => {
@@ -110,7 +135,19 @@ function renderGeneratedTeams(teams) {
   refreshImportAvailability();
 }
 
-function drawTeams() {
+function renderGeneratedTeams(teams) {
+  generatedTeams.hidden = false;
+  const capacity = Number(peoplePerTeam.value);
+  generatedTeams.innerHTML = `<p class="eyebrow">RESULTADO DO SORTEIO</p><h2>Times definidos</h2><div class="generated-teams-grid">${teams.map((team, index) => {
+    const members = [...team, ...Array.from({ length: Math.max(0, capacity - team.length) }, () => ({ name: "Vazio", empty: true }))];
+    return `<article><h3>Time ${index + 1}</h3><ol>${members.map((person) => `<li class="${person.empty ? "empty-generated-team" : ""}">${escapeGenerator(person.name)}${person.seedLevel ? `<small>${person.seedLevel}º cabeça de chave</small>` : ""}</li>`).join("")}</ol></article>`;
+  }).join("")}</div><div class="generator-import-actions"><button id="import-quick-game" class="secondary-button import-quick-game" type="button">Usar no Jogo por Resultado</button><button id="import-point-game" class="secondary-button import-quick-game" type="button">Usar no Jogo Ponto a Ponto</button></div>`;
+  document.querySelector("#import-quick-game").addEventListener("click", () => importToGame("result"));
+  document.querySelector("#import-point-game").addEventListener("click", () => importToGame("points"));
+  refreshImportAvailability();
+}
+
+function drawTeamsLegacy() {
   const teamCount = getTeamCount();
   const capacity = getPeoplePerTeam();
   if (!teamCount || !capacity) {
@@ -165,6 +202,61 @@ function drawTeams() {
   renderGeneratedTeams(teams);
 }
 
+function drawTeams() {
+  const teamCount = getTeamCount();
+  const capacity = getPeoplePerTeam();
+  if (!teamCount || !capacity) {
+    generatorMessage.textContent = "Informe a quantidade de times e de pessoas por time antes de sortear.";
+    generatorMessage.className = "auth-message is-error";
+    return;
+  }
+  saveParticipantDraftFromInputs();
+  const missingName = participantDraft.findIndex((person) => !person.name.trim());
+  if (missingName >= 0) {
+    generatorMessage.textContent = `Informe o nome do Participante ${missingName + 1} antes de sortear os times.`;
+    generatorMessage.className = "auth-message is-error";
+    document.querySelectorAll(".generator-person")[missingName]?.focus();
+    return;
+  }
+  const people = participantDraft.map((person) => ({ name: person.name.trim(), seedLevel: seedEnabled.checked ? person.seedLevel : 0 }));
+  const totalCapacity = teamCount * capacity;
+  if (people.length > totalCapacity) {
+    generatorMessage.textContent = `Não é possível sortear ${people.length} pessoas em ${teamCount} times com ${capacity} vagas por time.`;
+    generatorMessage.className = "auth-message is-error";
+    generatedTeams.hidden = true;
+    return;
+  }
+  const teams = Array.from({ length: teamCount }, () => []);
+  if (seedEnabled.checked) {
+    const perTeam = Number(seedsPerTeam.value);
+    const required = teamCount * perTeam;
+    const seeded = people.filter((person) => person.seedLevel);
+    if (perTeam > capacity || seeded.length !== required) {
+      generatorMessage.textContent = `Marque exatamente ${required} cabeças de chave para este sorteio.`;
+      generatorMessage.className = "auth-message is-error";
+      return;
+    }
+    for (let level = 1; level <= perTeam; level += 1) {
+      const levelSeeds = shuffle(people.filter((person) => person.seedLevel === level));
+      if (levelSeeds.length !== teamCount) {
+        generatorMessage.textContent = `Complete os ${teamCount} participantes do ${level}º nível de cabeça de chave.`;
+        generatorMessage.className = "auth-message is-error";
+        return;
+      }
+      teams.forEach((team, index) => team.push(levelSeeds[index]));
+    }
+  }
+  const remaining = shuffle(people.filter((person) => !person.seedLevel));
+  remaining.forEach((person) => {
+    const available = teams.map((team, index) => ({ index, size: team.length })).filter(({ size }) => size < capacity);
+    teams[available[Math.floor(Math.random() * available.length)].index].push(person);
+  });
+  lastDraw = teams;
+  generatorMessage.textContent = `${teamCount} times sorteados.`;
+  generatorMessage.className = "auth-message is-success";
+  renderGeneratedTeams(teams);
+}
+
 async function hasActiveGame() {
   const local = window.quickGameStore?.getActive?.();
   if (local?.status === "active" && local.started === true) return true;
@@ -206,9 +298,22 @@ async function importToGame(type) {
 
 peoplePerTeam.addEventListener("input", () => { if (Number(peoplePerTeam.value) > 6) peoplePerTeam.value = 6; generatorMessage.textContent = ""; refreshIdealHint(); });
 teamTotal.addEventListener("input", () => { if (Number(teamTotal.value) > 7) teamTotal.value = 7; generatorMessage.textContent = ""; refreshIdealHint(); });
-seedsPerTeam.addEventListener("change", () => renderPeopleInputs());
+seedsPerTeam.addEventListener("change", () => {
+  saveParticipantDraftFromInputs();
+  const limit = Number(seedsPerTeam.value) || 1;
+  participantDraft.forEach((person) => { if (person.seedLevel > limit) person.seedLevel = 0; });
+  renderPeopleInputs(false);
+});
 seedEnabled.addEventListener("change", () => { seedCountField.hidden = !seedEnabled.checked; renderPeopleInputs(); });
-peopleNames.addEventListener("change", (event) => { if (event.target.matches(".seed-check input")) renderPeopleInputs(); });
+peopleNames.addEventListener("change", (event) => {
+  if (!event.target.matches(".seed-check input")) return;
+  saveParticipantDraftFromInputs();
+  const field = event.target.closest(".generator-person-field");
+  const index = [...peopleNames.querySelectorAll(".generator-person-field")].indexOf(field);
+  if (index >= 0 && event.target.checked) participantDraft[index].seedLevel = Number(event.target.dataset.seedLevel) || nextSeedLevel();
+  if (index >= 0 && !event.target.checked) participantDraft[index].seedLevel = 0;
+  renderPeopleInputs(false);
+});
 document.querySelector("#draw-teams").addEventListener("click", drawTeams);
 document.querySelector("#add-generator-person").addEventListener("click", addGeneratorPerson);
 document.querySelector("#remove-generator-person").addEventListener("click", removeGeneratorPerson);
