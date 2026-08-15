@@ -63,7 +63,7 @@ function localDate(value) {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
-function renderResults() {
+function renderResultsLegacy() {
   const selectedDate = resultsDateFilter.value;
   const selectedType = resultsTypeFilter.value;
   const results = allResults.filter((result) => (!selectedDate || localDate(result.finishedAt) === selectedDate) && (selectedType === "all" || resultGameType(result) === selectedType));
@@ -81,6 +81,31 @@ function renderResults() {
     const bestWins = Math.max(...result.standings.map((team) => team.wins));
     return `<article class="result-card"><div class="result-card-heading"><div><p class="eyebrow">${date}</p><span class="result-game-type ${resultGameType(result)}">${resultGameTypeLabel(result)}</span><h2>${escapeResult(result.reason)}</h2></div><div class="result-actions"><button class="print-result" type="button" data-id="${result.id}">Enviar PDF</button><button class="delete-result" type="button" data-id="${result.id}">Excluir</button></div></div><div class="result-ranking">${result.standings.map((team, index) => `<div><strong>${index + 1}º</strong>${team.wins > 0 && team.wins === bestWins ? '<span class="leader-crown" title="Líder">♛</span>' : ""}<span class="result-team-name">${escapeResult(team.name)}</span>${resultStats(team, result)}</div>`).join("")}</div>${playerHighlight}</article>`;
   }).join("") + (visible.length < results.length ? `<button id="show-more-results" class="show-more-results" type="button">Mostrar mais</button>` : "");
+}
+
+function resultLeader(team, result) {
+  const leader = result.standings?.[0];
+  if (!leader || leader.wins <= 0) return false;
+  if (result.tieBreakMode === "wins") return team.wins === leader.wins;
+  return team.wins === leader.wins && team.difference === leader.difference && team.points === leader.points;
+}
+function renderResults() {
+  const selectedDate = resultsDateFilter.value;
+  const selectedType = resultsTypeFilter.value;
+  const results = allResults.filter((result) => (!selectedDate || localDate(result.finishedAt) === selectedDate) && (selectedType === "all" || resultGameType(result) === selectedType));
+  displayedResults = results;
+  if (!results.length) {
+    const message = selectedDate || selectedType !== "all" ? "Nenhum jogo encontrado com os filtros selecionados." : "Os resultados aparecerão aqui quando uma partida for finalizada.";
+    resultsList.innerHTML = `<section class="empty-results"><h2>Nenhum jogo encerrado</h2><p>${message}</p></section>`;
+    return;
+  }
+  const visible = results.slice(0, visibleResults);
+  resultsList.innerHTML = visible.map((result) => {
+    const date = new Date(result.finishedAt).toLocaleString("pt-BR");
+    const topPlayer = resultGameType(result) === "points" ? pointPlayerRanking(result)[0] : null;
+    const playerHighlight = topPlayer ? `<p class="result-top-player">Maior pontuador: <strong>${escapeResult(topPlayer.name)}</strong> · ${escapeResult(topPlayer.team)} · ${topPlayer.points} pontos</p>` : resultGameType(result) === "points" ? '<p class="result-top-player">Nenhum ponto individual foi registrado.</p>' : "";
+    return `<article class="result-card"><div class="result-card-heading"><div><p class="eyebrow">${date}</p><span class="result-game-type ${resultGameType(result)}">${resultGameTypeLabel(result)}</span><h2>${escapeResult(result.reason)}</h2></div><div class="result-actions"><button class="print-result" type="button" data-id="${result.id}">Enviar PDF</button><button class="delete-result" type="button" data-id="${result.id}">Excluir</button></div></div><div class="result-ranking">${result.standings.map((team, index) => `<div><strong>${index + 1}º</strong>${resultLeader(team, result) ? '<span class="leader-crown" title="Líder">♛</span>' : ""}<span class="result-team-name">${escapeResult(team.name)}</span>${resultStats(team, result)}</div>`).join("")}</div>${playerHighlight}</article>`;
+  }).join("") + (visible.length < results.length ? '<button id="show-more-results" class="show-more-results" type="button">Mostrar mais</button>' : "");
 }
 
 async function printResult(result) {

@@ -71,5 +71,17 @@ window.quickGameStore = {
     const { data, error } = await cloudSupabase.from("live_games").select("game_data,is_active,updated_at").eq("user_id", userData.user.id).eq("is_active", true).order("updated_at", { ascending: false }).limit(1).maybeSingle();
     return { data: data ? { ...data.game_data, isActive: data.is_active, updatedAt: data.updated_at } : null, error };
   },
+  subscribeToLiveGame(shareCode, onChange) {
+    if (!cloudSupabase || !shareCode) return null;
+    return cloudSupabase.channel(`manage-live-game-${shareCode}`)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "live_games", filter: `share_code=eq.${shareCode}` }, async () => {
+        const { data } = await this.getLiveGame(shareCode);
+        if (data) onChange(data);
+      })
+      .subscribe();
+  },
+  unsubscribeLiveGame(channel) {
+    if (cloudSupabase && channel) cloudSupabase.removeChannel(channel);
+  },
   getCloudClient() { return cloudSupabase; },
 };

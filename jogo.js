@@ -26,6 +26,7 @@ let gameStartedAt = "";
 let quickTieBreakMode = localStorage.getItem("volley-tie-break-mode") === "wins" ? "wins" : "full";
 let quickShowPointsBalance = localStorage.getItem("volley-show-points-balance") !== "false";
 let finishedQuickResult = null;
+let quickLiveChannel = null;
 
 function usesWinnerSelection() { return quickTieBreakMode === "wins" && !quickShowPointsBalance; }
 function winnerFromScore(score) {
@@ -163,6 +164,36 @@ function buildExpandedSchedule(previousRound, previousTeams, nextTeams, futureRo
 
 function scoreKey(round, game) { return `${round}-${game}`; }
 function rankingStats(team) { return `<small class="ranking-stats"><span><b>Vit.</b>${team.wins}</span><span><b>Der.</b>${team.losses}</span><span><b>Jogos</b>${team.games}</span>${quickShowPointsBalance ? `<span><b>Pontos</b>${team.points}</span><span><b>Saldo</b>${team.difference >= 0 ? "+" : ""}${team.difference}</span>` : ""}</small>`; }
+function quickLeader(team, standings) {
+  const leader = standings[0];
+  if (!leader || leader.wins <= 0) return false;
+  if (quickTieBreakMode === "wins") return team.wins === leader.wins;
+  return team.wins === leader.wins && team.difference === leader.difference && team.points === leader.points;
+}
+function applyQuickGameState(game) {
+  if (!game || game.gameType === "points" || game.status !== "active") return;
+  quickSchedule = game.schedule || [];
+  currentRound = Number(game.currentRound) || 0;
+  confirmedGameCount = Number(game.confirmedGameCount) || 0;
+  scores = new Map(game.scores || []);
+  currentTeams = game.teams || [];
+  currentPlayerCount = Number(game.playerCount) || 4;
+  currentPlayers = game.players || currentTeams.map(() => []);
+  quickTieBreakMode = game.tieBreakMode || quickTieBreakMode;
+  quickShowPointsBalance = game.showPointsBalance ?? quickShowPointsBalance;
+  currentShareCode = game.shareCode || currentShareCode;
+  gameStartedAt = game.startedAt || gameStartedAt;
+  confirmedGameCount = Math.min(confirmedGameCount, Math.max(0, (quickSchedule[currentRound]?.matches.length || 1) - 1));
+  window.quickGameStore.saveActive(game);
+  quickSetup.hidden = true;
+  quickGame.hidden = false;
+  document.body.classList.toggle("hide-team-points-balance", !quickShowPointsBalance);
+  renderCurrentRound();
+}
+function watchQuickGame() {
+  if (quickLiveChannel) window.quickGameStore.unsubscribeLiveGame(quickLiveChannel);
+  quickLiveChannel = window.quickGameStore.subscribeToLiveGame(currentShareCode, (game) => applyQuickGameState(game));
+}
 function saveQuickGame() {
   const game = { status: "active", started: true, gameType: "result", tieBreakMode: quickTieBreakMode, showPointsBalance: quickShowPointsBalance, shareCode: currentShareCode, startedAt: gameStartedAt, schedule: quickSchedule, currentRound, confirmedGameCount, scores: [...scores.entries()], teams: currentTeams, playerCount: currentPlayerCount, players: currentPlayers };
   window.quickGameStore.saveActive(game);
@@ -237,8 +268,7 @@ function validateScores() {
 
 function renderLiveRanking() {
   const standings = buildStandings();
-  const bestWins = Math.max(...standings.map((team) => team.wins));
-  document.querySelector("#live-ranking-list").innerHTML = standings.map((team, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong>${team.wins > 0 && team.wins === bestWins ? '<span class="leader-crown" title="Líder">♛</span>' : ""}${quickTeamDropdown(team.name)}${rankingStats(team)}</div>`).join("");
+  document.querySelector("#live-ranking-list").innerHTML = standings.map((team, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong>${quickLeader(team, standings) ? '<span class="leader-crown" title="Líder">♛</span>' : ""}${quickTeamDropdown(team.name)}${rankingStats(team)}</div>`).join("");
 }
 
 function persistPartialScores() {
@@ -290,6 +320,7 @@ function openLiveSettings() {
   panel.hidden = !panel.hidden;
   document.querySelector("#adjust-game-toggle").setAttribute("aria-expanded", String(!panel.hidden));
   if (!panel.hidden) {
+    overview.hidden = true;
     document.querySelector("#live-team-count").value = currentTeams.length;
     document.querySelector("#live-round-count").value = quickSchedule.length;
     document.querySelector("#live-player-count").value = currentPlayerCount;
@@ -297,6 +328,7 @@ function openLiveSettings() {
     document.querySelector("#live-players-panel").hidden = true;
     document.querySelector("#live-players-toggle").setAttribute("aria-expanded", "false");
     document.querySelector("#live-players-toggle").textContent = "Editar participantes";
+    window.requestAnimationFrame(() => panel.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
 }
 
@@ -439,6 +471,7 @@ async function finishQuickGame(message) {
   const { error } = await window.quickGameStore.saveResultToCloud(result);
   if (error) console.warn("Não foi possível salvar o resultado no Supabase.", error);
   window.quickGameStore.clearActive();
+  if (quickLiveChannel) { window.quickGameStore.unsubscribeLiveGame(quickLiveChannel); quickLiveChannel = null; }
   await window.quickGameStore.finishLiveGame(currentShareCode, result);
   quickGame.hidden = true; overview.hidden = true; quickFinished.hidden = false;
   document.querySelector("#finished-copy").textContent = message;
@@ -516,6 +549,12 @@ async function refreshQuickTieBreakMode() {
 }
 
 document.querySelector("#quick-settings-toggle").addEventListener("click", () => { const panel = document.querySelector("#quick-settings-panel"); panel.hidden = !panel.hidden; });
+const quickGameMenuToggle = document.querySelector("#quick-game-menu-toggle");
+const quickGameMenu = document.querySelector("#quick-game-menu");
+function closeQuickGameMenu() { quickGameMenu.hidden = true; quickGameMenuToggle.setAttribute("aria-expanded", "false"); }
+quickGameMenuToggle.addEventListener("click", () => { const open = quickGameMenu.hidden; quickGameMenu.hidden = !open; quickGameMenuToggle.setAttribute("aria-expanded", String(open)); if (open) { document.querySelector("#live-settings").hidden = true; document.querySelector("#adjust-game-toggle").setAttribute("aria-expanded", "false"); overview.hidden = true; } });
+quickGameMenu.addEventListener("click", (event) => { if (event.target.closest("button")) closeQuickGameMenu(); });
+document.addEventListener("click", (event) => { if (!event.target.closest(".game-menu")) closeQuickGameMenu(); });
 quickTeamCount.addEventListener("change", makeQuickTeamInputs);
 quickUnlimited.addEventListener("change", makeQuickTeamInputs);
 quickPlayerCount.addEventListener("change", makeQuickPlayerInputs);
@@ -533,8 +572,8 @@ document.querySelector("#quick-start").addEventListener("click", async () => {
   if (localActive?.status === "active" && localActive.started === true) { window.alert("Já existe um jogo em andamento. Encerre-o antes de iniciar outro."); return; }
   const { data: cloudActive } = await window.quickGameStore.getOwnActiveLiveGame();
   if (cloudActive?.status === "active" && cloudActive.started === true) { window.alert("Já existe um jogo em andamento nesta conta. Retorne ao jogo atual para continuar."); return; }
-  quickRoundCount.value = rounds; currentTeams = teams; currentPlayerCount = Number(quickPlayerCount.value); currentPlayers = getQuickPlayers(); currentShareCode = generateShareCode(); gameStartedAt = new Date().toISOString(); quickSchedule = buildQuickSchedule(teams, rounds); currentRound = 0; confirmedGameCount = 0; scores = new Map(); saveQuickGame();
-  quickSetup.hidden = true; quickGame.hidden = false; renderCurrentRound();
+  quickRoundCount.value = rounds; currentTeams = teams; currentPlayerCount = Number(quickPlayerCount.value); currentPlayers = getQuickPlayers(); currentShareCode = generateShareCode(); gameStartedAt = new Date().toISOString(); quickSchedule = buildQuickSchedule(teams, rounds); currentRound = 0; confirmedGameCount = 0; scores = new Map(); saveQuickGame(); watchQuickGame();
+  quickSetup.hidden = true; quickGame.hidden = false; renderCurrentRound(); watchQuickGame();
 });
 currentMatches.addEventListener("input", persistPartialScores);
 currentMatches.addEventListener("click", (event) => {
@@ -565,7 +604,7 @@ document.querySelector("#live-players-toggle").addEventListener("click", () => {
   document.querySelector("#live-players-toggle").textContent = open ? "Ocultar participantes" : "Editar participantes";
 });
 document.querySelector("#apply-live-settings").addEventListener("click", applyLiveSettings);
-document.querySelector("#show-rounds").addEventListener("click", () => { renderOverview(); overview.hidden = false; overview.scrollIntoView({ behavior: "smooth", block: "start" }); });
+document.querySelector("#show-rounds").addEventListener("click", () => { document.querySelector("#live-settings").hidden = true; document.querySelector("#adjust-game-toggle").setAttribute("aria-expanded", "false"); renderOverview(); overview.hidden = false; window.requestAnimationFrame(() => (overviewRounds.querySelector(".is-current") || overview).scrollIntoView({ behavior: "smooth", block: "start" })); });
 document.querySelector("#print-game").addEventListener("click", printQuickGamePdf);
 document.querySelector("#finished-print-game").addEventListener("click", printFinishedQuickResult);
 document.querySelector("#copy-quick-groups").addEventListener("click", copyQuickGroups);
@@ -606,7 +645,7 @@ makeQuickTeamInputs();
 const savedQuickGame = window.quickGameStore.getActive();
 if (savedQuickGame?.status === "active" && savedQuickGame.started === true && savedQuickGame.gameType !== "points") {
   quickSchedule = savedQuickGame.schedule; currentRound = savedQuickGame.currentRound; confirmedGameCount = savedQuickGame.confirmedGameCount || 0; scores = new Map(savedQuickGame.scores || []); currentTeams = savedQuickGame.teams || []; currentPlayerCount = savedQuickGame.playerCount || 4; currentPlayers = savedQuickGame.players || currentTeams.map(() => []); quickTieBreakMode = savedQuickGame.tieBreakMode || quickTieBreakMode; quickShowPointsBalance = savedQuickGame.showPointsBalance ?? quickShowPointsBalance; currentShareCode = savedQuickGame.shareCode || generateShareCode(); gameStartedAt = savedQuickGame.startedAt || new Date().toISOString(); confirmedGameCount = Math.min(confirmedGameCount, Math.max(0, (quickSchedule[currentRound]?.matches.length || 1) - 1)); saveQuickGame();
-  quickSetup.hidden = true; quickGame.hidden = false; renderCurrentRound();
+  quickSetup.hidden = true; quickGame.hidden = false; renderCurrentRound(); watchQuickGame();
 } else {
   try {
     const imported = JSON.parse(localStorage.getItem("volley-generator-import") || "null");
@@ -625,4 +664,11 @@ if (savedQuickGame?.status === "active" && savedQuickGame.started === true && sa
       localStorage.removeItem("volley-generator-import");
     }
   } catch { localStorage.removeItem("volley-generator-import"); }
+  window.quickGameStore.getOwnActiveLiveGame().then(({ data }) => {
+    if (data?.status === "active" && data.started === true && data.gameType === "result") {
+      window.quickGameStore.saveActive(data);
+      applyQuickGameState(data);
+      watchQuickGame();
+    }
+  }).catch(() => {});
 }

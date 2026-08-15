@@ -63,8 +63,10 @@ function renderViewer(game) {
   document.querySelector("#viewer-print-pdf").hidden = !finished;
   viewerCode.textContent = `Código: ${liveCode}`;
   viewerStatus.textContent = `Atualizado às ${new Date(game.updatedAt || Date.now()).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}.`;
-  const standings = standingsFor(game); const bestWins = Math.max(...standings.map((team) => team.wins));
-  document.querySelector("#viewer-ranking").innerHTML = standings.map((team, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong>${team.wins > 0 && team.wins === bestWins ? '<span class="leader-crown" title="Líder">♛</span>' : ""}<span>${escapeViewer(team.name)}</span>${viewerStats(team)}</div>`).join("");
+  const standings = standingsFor(game);
+  const leader = standings[0];
+  const isLeader = (team) => leader?.wins > 0 && (game.tieBreakMode === "wins" ? team.wins === leader.wins : team.wins === leader.wins && team.difference === leader.difference && team.points === leader.points);
+  document.querySelector("#viewer-ranking").innerHTML = standings.map((team, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong>${isLeader(team) ? '<span class="leader-crown" title="Líder">♛</span>' : ""}<span>${escapeViewer(team.name)}</span>${viewerStats(team)}</div>`).join("");
   const scores = new Map(game.scores || []);
   const currentGame = Number(game.gameType === "points" ? game.pointMatch : game.confirmedGameCount) || 0;
   document.querySelector("#viewer-rounds").innerHTML = game.schedule.map((round, roundIndex) => `<article class="round overview-round ${roundIndex === game.currentRound ? "is-current" : ""}"><header class="round-title">Rodada ${roundIndex + 1}<span>${roundIndex === game.currentRound ? "ATUAL" : roundIndex < game.currentRound ? "CONCLUÍDA" : "AGUARDANDO"}</span></header>${round.matches.map(([home, away], gameIndex) => { const score = scores.get(scoreKeyViewer(roundIndex, gameIndex)); const value = score ? (Array.isArray(score) ? `${score[0]} × ${score[1]}` : `${score.home} × ${score.away}`) : "×"; return `<div class="match overview-match ${roundIndex === game.currentRound && gameIndex === currentGame ? "is-current-match" : ""}">${viewerTeamDropdown(game, home)}<span class="overview-score">${value}</span>${viewerTeamDropdown(game, away, true)}</div>`; }).join("")}${round.bye ? `<div class="bye">Folga: ${viewerTeamDropdown(game, round.bye)}</div>` : ""}</article>`).join("");

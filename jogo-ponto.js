@@ -24,6 +24,7 @@ let pointRetroEditingUnlocked = false;
 let pointTieBreakMode = localStorage.getItem("volley-tie-break-mode") === "wins" ? "wins" : "full";
 let pointShowPointsBalance = localStorage.getItem("volley-show-points-balance") !== "false";
 let finishedPointResult = null;
+let pointLiveChannel = null;
 
 function escapePoint(value) { return String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#039;", '"': "&quot;" })[char]); }
 function maxPointRounds(total) { return total % 2 === 0 ? total - 1 : total; }
@@ -54,6 +55,12 @@ function savePointGame() {
   const game = { status: "active", started: true, gameType: "points", tieBreakMode: pointTieBreakMode, shareCode: pointShareCode, startedAt: pointStartedAt, schedule: pointSchedule, currentRound: pointRound, pointMatch, scores: [...pointScores.entries()], pointHistory: [...pointHistory.entries()], teams: pointTeams, playerCount: pointCurrentPlayerCount, players: pointRoster, allowNoNames: pointRequireNames.checked };
   window.quickGameStore.saveActive(game);
   window.quickGameStore.saveLiveGame(game).then(({ error }) => { const status = document.querySelector("#point-share-code-status"); status.textContent = error ? "Não foi possível publicar o acompanhamento." : "Acompanhamento ativo."; }).catch(() => { const status = document.querySelector("#point-share-code-status"); status.textContent = "Não foi possível publicar o acompanhamento."; });
+}
+function watchPointGame() {
+  if (pointLiveChannel) window.quickGameStore.unsubscribeLiveGame(pointLiveChannel);
+  pointLiveChannel = window.quickGameStore.subscribeToLiveGame(pointShareCode, (game) => {
+    if (game?.status === "active" && game.started === true && game.gameType === "points") restorePointGame(game, false);
+  });
 }
 
 function uniquePointMatchdays(teams) {
@@ -162,6 +169,17 @@ function renderPointHistory() {
   section.hidden = false;
   section.innerHTML = `<h3>Pontos registrados</h3><p>${escapePoint(home)} × ${escapePoint(away)}</p><div class="point-history">${historyItems(pointKey(pointRound, pointMatch))}</div>`;
 }
+function pointLeader(team, standings) {
+  const leader = standings[0];
+  if (!leader || leader.wins <= 0) return false;
+  if (pointTieBreakMode === "wins") return team.wins === leader.wins;
+  return team.wins === leader.wins && team.difference === leader.difference && team.points === leader.points;
+}
+function renderPointRanking() {
+  const standings = getPointStandings();
+  document.querySelector("#point-ranking").innerHTML = standings.map((team, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong>${pointLeader(team, standings) ? '<span class="leader-crown" title="Líder">♛</span>' : ""}${pointTeamDropdown(team.name)}<small class="ranking-stats"><span><b>Vit.</b>${team.wins}</span><span><b>Der.</b>${team.losses}</span><span><b>Jogos</b>${team.games}</span><span><b>Pontos</b>${team.points}</span><span><b>Saldo</b>${team.difference >= 0 ? "+" : ""}${team.difference}</span></small></div>`).join("");
+}
+
 function renderPointMatch() {
   const round = pointSchedule[pointRound];
   if (!round) {
@@ -188,7 +206,7 @@ function pointTeamDropdown(team, isAway = false) {
   return `<div class="team-dropdown ${isAway ? "team-away" : ""}"><details><summary>${escapePoint(team)}</summary><div class="dropdown-menu"><strong>${escapePoint(team)}</strong>${content}</div></details></div>`;
 }
 
-function renderPointRanking() {
+function renderPointRankingLegacy() {
   const standings = getPointStandings(); const bestWins = Math.max(...standings.map((team) => team.wins));
   document.querySelector("#point-ranking").innerHTML = standings.map((team, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong>${team.wins > 0 && team.wins === bestWins ? '<span class="leader-crown" title="Líder">♛</span>' : ""}${pointTeamDropdown(team.name)}<small class="ranking-stats"><span><b>Vit.</b>${team.wins}</span><span><b>Der.</b>${team.losses}</span><span><b>Jogos</b>${team.games}</span><span><b>Pontos</b>${team.points}</span><span><b>Saldo</b>${team.difference >= 0 ? "+" : ""}${team.difference}</span></small></div>`).join("");
 }
@@ -360,13 +378,15 @@ function openLivePointSettings() {
   panel.hidden = !panel.hidden;
   document.querySelector("#point-adjust-game").setAttribute("aria-expanded", String(!panel.hidden));
   if (!panel.hidden) {
+    document.querySelector("#point-overview").hidden = true;
     document.querySelector("#point-live-team-count").value = pointTeams.length;
     document.querySelector("#point-live-round-count").value = pointSchedule.length;
     document.querySelector("#point-live-player-count").value = pointCurrentPlayerCount;
     makeLivePointTeamInputs();
     document.querySelector("#point-live-players").hidden = true;
     document.querySelector("#point-live-players-toggle").setAttribute("aria-expanded", "false");
-    document.querySelector("#point-live-players-toggle").textContent = "Editar participantes";
+  document.querySelector("#point-live-players-toggle").textContent = "Editar participantes";
+    window.requestAnimationFrame(() => panel.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
 }
 function applyLivePointSettings() {
@@ -453,6 +473,7 @@ async function finishPointGame(message) {
   const { error } = await window.quickGameStore.saveResultToCloud(result);
   if (error) console.warn("Não foi possível salvar o resultado no Supabase.", error);
   window.quickGameStore.clearActive();
+  if (pointLiveChannel) { window.quickGameStore.unsubscribeLiveGame(pointLiveChannel); pointLiveChannel = null; }
   await window.quickGameStore.finishLiveGame(pointShareCode, result);
   document.querySelector("#point-game").hidden = true;
   document.querySelector("#point-overview").hidden = true;
@@ -544,6 +565,12 @@ function closeScorerDialog() {
 }
 
 document.querySelector("#point-settings-toggle").addEventListener("click", () => { const panel = document.querySelector("#point-settings-panel"); panel.hidden = !panel.hidden; });
+const pointGameMenuToggle = document.querySelector("#point-game-menu-toggle");
+const pointGameMenu = document.querySelector("#point-game-menu");
+function closePointGameMenu() { pointGameMenu.hidden = true; pointGameMenuToggle.setAttribute("aria-expanded", "false"); }
+pointGameMenuToggle.addEventListener("click", () => { const open = pointGameMenu.hidden; pointGameMenu.hidden = !open; pointGameMenuToggle.setAttribute("aria-expanded", String(open)); if (open) { document.querySelector("#point-live-settings").hidden = true; document.querySelector("#point-adjust-game").setAttribute("aria-expanded", "false"); document.querySelector("#point-overview").hidden = true; } });
+pointGameMenu.addEventListener("click", (event) => { if (event.target.closest("button")) closePointGameMenu(); });
+document.addEventListener("click", (event) => { if (!event.target.closest(".game-menu")) closePointGameMenu(); });
 pointTeamCount.addEventListener("change", makePointInputs);
 pointPlayerCount.addEventListener("change", makePointPlayerInputs);
 pointUnlimited.addEventListener("change", makePointInputs);
@@ -562,7 +589,7 @@ document.querySelector("#point-start").addEventListener("click", async () => {
   const rounds = normalizePointRounds(pointRoundCount.value, pointTeams.length, pointUnlimited.checked);
   pointRoundCount.value = rounds; pointCurrentPlayerCount = Number(pointPlayerCount.value); pointSchedule = buildPointSchedule(pointTeams, rounds); pointRound = 0; pointMatch = 0;
   pointScores.clear(); pointHistory.clear(); selectedOverviewMatch = ""; selectedOverviewTeam = ""; pointShareCode = generatePointShareCode(); pointStartedAt = new Date().toISOString();
-  document.querySelector("#point-setup").hidden = true; document.querySelector("#point-game").hidden = false; renderPointMatch(); savePointGame();
+  document.querySelector("#point-setup").hidden = true; document.querySelector("#point-game").hidden = false; renderPointMatch(); savePointGame(); watchPointGame();
 });
 document.querySelector("#point-current-match").addEventListener("click", (event) => {
   const add = event.target.closest(".point-add");
@@ -589,7 +616,7 @@ document.querySelector("#point-scorer-continue").addEventListener("click", () =>
 });
 document.querySelector("#point-scorer-close").addEventListener("click", closeScorerDialog);
 document.querySelector("#point-scorer-dialog").addEventListener("cancel", () => { selectedPointTeam = ""; selectedPointPlayer = ""; });
-document.querySelector("#point-show-rounds").addEventListener("click", () => { if (!pointRetroEditingUnlocked) document.querySelector("#point-history-editor").hidden = true; renderPointOverview(); document.querySelector("#point-overview").hidden = false; document.querySelector("#point-overview").scrollIntoView({ behavior: "smooth" }); });
+document.querySelector("#point-show-rounds").addEventListener("click", () => { document.querySelector("#point-live-settings").hidden = true; document.querySelector("#point-adjust-game").setAttribute("aria-expanded", "false"); if (!pointRetroEditingUnlocked) document.querySelector("#point-history-editor").hidden = true; renderPointOverview(); document.querySelector("#point-overview").hidden = false; window.requestAnimationFrame(() => (document.querySelector("#point-overview-rounds .is-current") || document.querySelector("#point-overview")).scrollIntoView({ behavior: "smooth", block: "start" })); });
 document.querySelector("#point-print-game").addEventListener("click", printPointGamePdf);
 document.querySelector("#point-finished-print-game").addEventListener("click", printFinishedPointResult);
 document.querySelector("#copy-point-groups").addEventListener("click", copyPointGroups);
@@ -658,7 +685,7 @@ try {
   }
 } catch { localStorage.removeItem("volley-generator-import-points"); }
 
-function restorePointGame(game) {
+function restorePointGame(game, persist = false) {
   pointTeams = game.teams || [];
   pointRoster = game.players || pointTeams.map(() => []);
   pointSchedule = game.schedule || [];
@@ -671,15 +698,17 @@ function restorePointGame(game) {
   pointRequireNames.checked = Boolean(game.allowNoNames);
   pointScores.clear(); (game.scores || []).forEach(([key, score]) => { const [roundIndex, matchIndex] = key.split("-").map(Number); if (score.finished && score.confirmed === undefined) score.confirmed = roundIndex < pointRound || (roundIndex === pointRound && matchIndex < pointMatch); pointScores.set(key, score); });
   pointHistory.clear(); (game.pointHistory || []).forEach(([key, history]) => pointHistory.set(key, history));
+  window.quickGameStore.saveActive(game);
   document.querySelector("#point-setup").hidden = true;
   document.querySelector("#point-game").hidden = false;
   renderPointMatch();
-  savePointGame();
+  if (persist) savePointGame();
+  watchPointGame();
 }
 
 (async () => {
   const localGame = window.quickGameStore.getActive();
-  if (localGame?.status === "active" && localGame.started === true && localGame.gameType === "points") { restorePointGame(localGame); return; }
+  if (localGame?.status === "active" && localGame.started === true && localGame.gameType === "points") { restorePointGame(localGame, true); return; }
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const { data: cloudGame } = await window.quickGameStore.getOwnActiveLiveGame();
     if (cloudGame?.status === "active" && cloudGame.started === true && cloudGame.gameType === "points") { restorePointGame(cloudGame); return; }
