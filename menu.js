@@ -7,6 +7,7 @@ const logoutButton = document.querySelector("#logout-button");
 const themeToggle = document.querySelector("#theme-toggle");
 let currentUser = null;
 let sessionChecked = false;
+let activeGamePoll = null;
 
 function applyTheme(theme) {
   const dark = theme === "dark";
@@ -38,7 +39,13 @@ function updateAccount(user) {
   currentUser = user;
   nameNode.textContent = user.user_metadata?.display_name || user.email;
   emailNode.textContent = user.email;
-  window.quickGameStore.getOwnActiveLiveGame().then(({ data }) => { if (data?.status === "active" && data.started === true) renderCurrentGame(data); }).catch(() => {});
+  const refreshActiveGame = () => window.quickGameStore.getOwnActiveLiveGame().then(({ data }) => {
+    if (data?.status === "active" && data.started === true) renderCurrentGame(data);
+    else document.querySelector("#current-game-menu").hidden = true;
+  }).catch(() => {});
+  refreshActiveGame();
+  if (activeGamePoll) window.clearInterval(activeGamePoll);
+  activeGamePoll = window.setInterval(refreshActiveGame, 2500);
 }
 
 if (!menuSupabase) returnToLogin();

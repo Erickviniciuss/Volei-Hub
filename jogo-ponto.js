@@ -25,6 +25,8 @@ let pointTieBreakMode = localStorage.getItem("volley-tie-break-mode") === "wins"
 let pointShowPointsBalance = localStorage.getItem("volley-show-points-balance") !== "false";
 let finishedPointResult = null;
 let pointLiveChannel = null;
+let pointLivePoll = null;
+let pointLastRemoteUpdate = "";
 
 function escapePoint(value) { return String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#039;", '"': "&quot;" })[char]); }
 function maxPointRounds(total) { return total % 2 === 0 ? total - 1 : total; }
@@ -58,9 +60,16 @@ function savePointGame() {
 }
 function watchPointGame() {
   if (pointLiveChannel) window.quickGameStore.unsubscribeLiveGame(pointLiveChannel);
-  pointLiveChannel = window.quickGameStore.subscribeToLiveGame(pointShareCode, (game) => {
-    if (game?.status === "active" && game.started === true && game.gameType === "points") restorePointGame(game, false);
-  });
+  if (pointLivePoll) window.clearInterval(pointLivePoll);
+  const receiveUpdate = (game) => {
+    if (!game || game.updatedAt === pointLastRemoteUpdate) return;
+    pointLastRemoteUpdate = game.updatedAt || String(Date.now());
+    if (game.status === "active" && game.started === true && game.gameType === "points") restorePointGame(game, false);
+  };
+  pointLiveChannel = window.quickGameStore.subscribeToLiveGame(pointShareCode, receiveUpdate);
+  const refresh = async () => { const { data } = await window.quickGameStore.getLiveGame(pointShareCode); if (data?.isActive) receiveUpdate(data); };
+  refresh().catch(() => {});
+  pointLivePoll = window.setInterval(() => refresh().catch(() => {}), 2500);
 }
 
 function uniquePointMatchdays(teams) {
@@ -474,6 +483,7 @@ async function finishPointGame(message) {
   if (error) console.warn("Não foi possível salvar o resultado no Supabase.", error);
   window.quickGameStore.clearActive();
   if (pointLiveChannel) { window.quickGameStore.unsubscribeLiveGame(pointLiveChannel); pointLiveChannel = null; }
+  if (pointLivePoll) { window.clearInterval(pointLivePoll); pointLivePoll = null; }
   await window.quickGameStore.finishLiveGame(pointShareCode, result);
   document.querySelector("#point-game").hidden = true;
   document.querySelector("#point-overview").hidden = true;
@@ -715,3 +725,10 @@ function restorePointGame(game, persist = false) {
     if (attempt < 2) await new Promise((resolve) => window.setTimeout(resolve, 350));
   }
 })().catch(() => {});
+
+window.setInterval(() => {
+  if (pointShareCode) return;
+  window.quickGameStore.getOwnActiveLiveGame().then(({ data }) => {
+    if (data?.status === "active" && data.started === true && data.gameType === "points") restorePointGame(data, false);
+  }).catch(() => {});
+}, 2500);

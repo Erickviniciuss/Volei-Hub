@@ -27,6 +27,8 @@ let quickTieBreakMode = localStorage.getItem("volley-tie-break-mode") === "wins"
 let quickShowPointsBalance = localStorage.getItem("volley-show-points-balance") !== "false";
 let finishedQuickResult = null;
 let quickLiveChannel = null;
+let quickLivePoll = null;
+let quickLastRemoteUpdate = "";
 
 function usesWinnerSelection() { return quickTieBreakMode === "wins" && !quickShowPointsBalance; }
 function winnerFromScore(score) {
@@ -192,7 +194,16 @@ function applyQuickGameState(game) {
 }
 function watchQuickGame() {
   if (quickLiveChannel) window.quickGameStore.unsubscribeLiveGame(quickLiveChannel);
-  quickLiveChannel = window.quickGameStore.subscribeToLiveGame(currentShareCode, (game) => applyQuickGameState(game));
+  if (quickLivePoll) window.clearInterval(quickLivePoll);
+  const receiveUpdate = (game) => {
+    if (!game || game.updatedAt === quickLastRemoteUpdate) return;
+    quickLastRemoteUpdate = game.updatedAt || String(Date.now());
+    applyQuickGameState(game);
+  };
+  quickLiveChannel = window.quickGameStore.subscribeToLiveGame(currentShareCode, receiveUpdate);
+  const refresh = async () => { const { data } = await window.quickGameStore.getLiveGame(currentShareCode); if (data?.isActive) receiveUpdate(data); };
+  refresh().catch(() => {});
+  quickLivePoll = window.setInterval(() => refresh().catch(() => {}), 2500);
 }
 function saveQuickGame() {
   const game = { status: "active", started: true, gameType: "result", tieBreakMode: quickTieBreakMode, showPointsBalance: quickShowPointsBalance, shareCode: currentShareCode, startedAt: gameStartedAt, schedule: quickSchedule, currentRound, confirmedGameCount, scores: [...scores.entries()], teams: currentTeams, playerCount: currentPlayerCount, players: currentPlayers };
@@ -472,6 +483,7 @@ async function finishQuickGame(message) {
   if (error) console.warn("Não foi possível salvar o resultado no Supabase.", error);
   window.quickGameStore.clearActive();
   if (quickLiveChannel) { window.quickGameStore.unsubscribeLiveGame(quickLiveChannel); quickLiveChannel = null; }
+  if (quickLivePoll) { window.clearInterval(quickLivePoll); quickLivePoll = null; }
   await window.quickGameStore.finishLiveGame(currentShareCode, result);
   quickGame.hidden = true; overview.hidden = true; quickFinished.hidden = false;
   document.querySelector("#finished-copy").textContent = message;
@@ -672,3 +684,10 @@ if (savedQuickGame?.status === "active" && savedQuickGame.started === true && sa
     }
   }).catch(() => {});
 }
+
+window.setInterval(() => {
+  if (currentShareCode) return;
+  window.quickGameStore.getOwnActiveLiveGame().then(({ data }) => {
+    if (data?.status === "active" && data.started === true && data.gameType === "result") { applyQuickGameState(data); watchQuickGame(); }
+  }).catch(() => {});
+}, 2500);
