@@ -64,10 +64,16 @@ function watchPointGame() {
   const receiveUpdate = (game) => {
     if (!game || game.updatedAt === pointLastRemoteUpdate) return;
     pointLastRemoteUpdate = game.updatedAt || String(Date.now());
+    if (game.status === "finished" || game.isActive === false) {
+      stopPointGameSync();
+      window.quickGameStore.clearActive();
+      showPointFinished(game);
+      return;
+    }
     if (game.status === "active" && game.started === true && game.gameType === "points") restorePointGame(game, false);
   };
   pointLiveChannel = window.quickGameStore.subscribeToLiveGame(pointShareCode, receiveUpdate);
-  const refresh = async () => { const { data } = await window.quickGameStore.getLiveGame(pointShareCode); if (data?.isActive) receiveUpdate(data); };
+  const refresh = async () => { const { data } = await window.quickGameStore.getLiveGame(pointShareCode); if (data) receiveUpdate(data); };
   refresh().catch(() => {});
   pointLivePoll = window.setInterval(() => refresh().catch(() => {}), 2500);
 }
@@ -462,6 +468,37 @@ function renderPointFinishedHistory() {
   })).join("");
   document.querySelector("#point-finished-history").innerHTML = `<h3>Histórico de movimentos</h3>${sections || "<p>Nenhum ponto registrado.</p>"}`;
 }
+function stopPointGameSync() {
+  if (pointLiveChannel) { window.quickGameStore.unsubscribeLiveGame(pointLiveChannel); pointLiveChannel = null; }
+  if (pointLivePoll) { window.clearInterval(pointLivePoll); pointLivePoll = null; }
+}
+function showPointFinished(result) {
+  finishedPointResult = result;
+  pointTieBreakMode = result.tieBreakMode || pointTieBreakMode;
+  pointShowPointsBalance = result.showPointsBalance !== false;
+  document.body.classList.toggle("hide-team-points-balance", !pointShowPointsBalance);
+  pointTeams = result.teams || pointTeams;
+  pointRoster = result.players || pointRoster;
+  pointSchedule = result.schedule || pointSchedule;
+  pointCurrentPlayerCount = Number(result.playerCount) || pointCurrentPlayerCount;
+  pointHistory.clear();
+  (result.pointHistory || []).forEach(([key, history]) => pointHistory.set(key, history));
+  document.querySelector("#point-setup").hidden = true;
+  document.querySelector("#point-game").hidden = true;
+  document.querySelector("#point-overview").hidden = true;
+  document.querySelector("#point-finished").hidden = false;
+  document.querySelector("#point-finished-copy").textContent = result.reason || "O jogo foi encerrado.";
+  const standings = result.standings || [];
+  const playerStandings = result.playerStandings || [];
+  const teamRows = standings.map((team, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong><span>${escapePoint(team.name)}</span><small class="ranking-stats"><span><b>Vit.</b>${team.wins}</span><span><b>Der.</b>${team.losses}</span><span><b>Jogos</b>${team.games}</span><span><b>Pontos</b>${team.points}</span><span><b>Saldo</b>${team.difference >= 0 ? "+" : ""}${team.difference}</span></small></div>`).join("");
+  const playerRows = playerStandings.length ? playerStandings.slice(0, 10).map((player, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong><span>${escapePoint(player.name)} <small>(${escapePoint(player.team)})</small></span><small class="ranking-stats"><span><b>Pontos</b>${player.points}</span></small></div>`).join("") : "<p>Nenhum ponto individual foi registrado.</p>";
+  document.querySelector("#point-finished-ranking").innerHTML = `<h3>Classificação final</h3><div class="ranking-list">${teamRows}</div>`;
+  document.querySelector("#point-player-ranking").innerHTML = `<h3>Top 10 jogadores que mais pontuaram</h3><div class="ranking-list">${playerRows}</div>`;
+  renderPointFinishedHistory();
+  document.querySelector("#point-finished-history").hidden = true;
+  document.querySelector("#point-finished-history-toggle").setAttribute("aria-expanded", "false");
+  document.querySelector("#point-finished-history-toggle").textContent = "Ver histórico de movimentos";
+}
 async function refreshPointTieBreakMode() {
   const client = window.quickGameStore.getCloudClient();
   if (!client) return;
@@ -482,9 +519,10 @@ async function finishPointGame(message) {
   const { error } = await window.quickGameStore.saveResultToCloud(result);
   if (error) console.warn("Não foi possível salvar o resultado no Supabase.", error);
   window.quickGameStore.clearActive();
-  if (pointLiveChannel) { window.quickGameStore.unsubscribeLiveGame(pointLiveChannel); pointLiveChannel = null; }
-  if (pointLivePoll) { window.clearInterval(pointLivePoll); pointLivePoll = null; }
+  stopPointGameSync();
   await window.quickGameStore.finishLiveGame(pointShareCode, result);
+  showPointFinished(result);
+  return;
   document.querySelector("#point-game").hidden = true;
   document.querySelector("#point-overview").hidden = true;
   document.querySelector("#point-finished").hidden = false;

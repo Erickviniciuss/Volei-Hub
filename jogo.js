@@ -192,16 +192,39 @@ function applyQuickGameState(game) {
   document.body.classList.toggle("hide-team-points-balance", !quickShowPointsBalance);
   renderCurrentRound();
 }
+function stopQuickGameSync() {
+  if (quickLiveChannel) { window.quickGameStore.unsubscribeLiveGame(quickLiveChannel); quickLiveChannel = null; }
+  if (quickLivePoll) { window.clearInterval(quickLivePoll); quickLivePoll = null; }
+}
+function showQuickFinished(result) {
+  finishedQuickResult = result;
+  quickTieBreakMode = result.tieBreakMode || quickTieBreakMode;
+  quickShowPointsBalance = result.showPointsBalance !== false;
+  document.body.classList.toggle("hide-team-points-balance", !quickShowPointsBalance);
+  quickSetup.hidden = true;
+  quickGame.hidden = true;
+  overview.hidden = true;
+  quickFinished.hidden = false;
+  document.querySelector("#finished-copy").textContent = result.reason || "O jogo foi encerrado.";
+  const standings = result.standings || [];
+  document.querySelector("#finished-ranking").innerHTML = `<h3>Classificação final</h3><div class="ranking-list">${standings.map((team, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong><span>${escapeQuick(team.name)}</span>${rankingStats(team)}</div>`).join("")}</div>`;
+}
 function watchQuickGame() {
   if (quickLiveChannel) window.quickGameStore.unsubscribeLiveGame(quickLiveChannel);
   if (quickLivePoll) window.clearInterval(quickLivePoll);
   const receiveUpdate = (game) => {
     if (!game || game.updatedAt === quickLastRemoteUpdate) return;
     quickLastRemoteUpdate = game.updatedAt || String(Date.now());
+    if (game.status === "finished" || game.isActive === false) {
+      stopQuickGameSync();
+      window.quickGameStore.clearActive();
+      showQuickFinished(game);
+      return;
+    }
     applyQuickGameState(game);
   };
   quickLiveChannel = window.quickGameStore.subscribeToLiveGame(currentShareCode, receiveUpdate);
-  const refresh = async () => { const { data } = await window.quickGameStore.getLiveGame(currentShareCode); if (data?.isActive) receiveUpdate(data); };
+  const refresh = async () => { const { data } = await window.quickGameStore.getLiveGame(currentShareCode); if (data) receiveUpdate(data); };
   refresh().catch(() => {});
   quickLivePoll = window.setInterval(() => refresh().catch(() => {}), 2500);
 }
@@ -482,9 +505,10 @@ async function finishQuickGame(message) {
   const { error } = await window.quickGameStore.saveResultToCloud(result);
   if (error) console.warn("Não foi possível salvar o resultado no Supabase.", error);
   window.quickGameStore.clearActive();
-  if (quickLiveChannel) { window.quickGameStore.unsubscribeLiveGame(quickLiveChannel); quickLiveChannel = null; }
-  if (quickLivePoll) { window.clearInterval(quickLivePoll); quickLivePoll = null; }
+  stopQuickGameSync();
   await window.quickGameStore.finishLiveGame(currentShareCode, result);
+  showQuickFinished(result);
+  return;
   quickGame.hidden = true; overview.hidden = true; quickFinished.hidden = false;
   document.querySelector("#finished-copy").textContent = message;
   document.querySelector("#finished-ranking").innerHTML = `<h3>Classificação final</h3><div class="ranking-list">${standings.map((team, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong><span>${escapeQuick(team.name)}</span>${rankingStats(team)}</div>`).join("")}</div>`;
