@@ -333,7 +333,7 @@ input { padding: 11px 12px; }
 input:focus, select:focus { outline: 3px solid rgba(103, 232, 249, .25); border-color: var(--purple); }
 button { min-height: 47px; padding: 0 22px; border: 0; border-radius: 10px; color: var(--accent-text); background: var(--purple); box-shadow: 0 7px 15px rgba(34, 211, 238, .22); cursor: pointer; font: 700 .95rem "Outfit", sans-serif; transition: transform .18s, background .18s; }
 button:hover { background: var(--purple-dark); transform: translateY(-1px); }
-.team-names { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--line); }
+.team-names { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--line); }
 .name-field { display: grid; gap: 6px; color: var(--muted); font-size: .78rem; font-weight: 700; }
 .names-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 21px; }
 .names-toggle-row p { margin: 0; color: var(--muted); font-size: .9rem; }
@@ -348,8 +348,9 @@ button:hover { background: var(--purple-dark); transform: translateY(-1px); }
 .player-inputs input { padding: 9px 10px; font-size: .88rem; }
 
 .generator-seed-settings { display: flex; align-items: end; gap: 18px; margin-top: 24px; padding: 18px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.generator-seed-settings[hidden] { display: none !important; }
 .generator-seed-settings .switch-label { flex: 1; }
-.generator-seed-settings #seed-count-field[hidden] { display: none; }
+.generator-seed-settings #seed-count-field[hidden] { display: none !important; }
 .generator-ideal { margin: 14px 0 0; padding: 10px 13px; border-radius: 10px; color: var(--muted); background: var(--soft-card); font-size: .86rem; }
 .generator-ideal strong { color: var(--purple-dark); }
 .generator-people { overflow: visible; }
@@ -454,6 +455,16 @@ button:hover { background: var(--purple-dark); transform: translateY(-1px); }
 .bye .team-dropdown, .quick-bye .team-dropdown { display: inline-block; vertical-align: middle; color: var(--muted); font-size: .9em; font-weight: 700; }
 .bye:last-child { border-radius: 0 0 15px 15px; box-shadow: inset 0 -1px 0 var(--line); }
 .bye strong { color: var(--ink); }
+
+/* Styles for Star-based draw */
+.star-rating-picker { display: flex; align-items: center; width: 100%; margin-top: 6px; overflow: hidden; }
+.star-rating-buttons { display: flex; align-items: center; gap: 4px; }
+.star-btn { display: inline-flex; align-items: center; justify-content: center; width: auto; height: auto; min-height: 0; min-width: 0; padding: 0 2px; border: 0 !important; border-radius: 0; color: #475569; background: transparent !important; box-shadow: none !important; font-size: 1.45rem; line-height: 1; cursor: pointer; transition: color .15s, transform .15s; }
+.star-btn:hover { color: #fbbf24; background: transparent !important; transform: scale(1.2); }
+.star-btn.is-active { color: #fbbf24; background: transparent !important; filter: drop-shadow(0 0 3px rgba(251, 191, 36, .5)); }
+.team-points-badge { display: inline-block; margin-left: 6px; padding: 2px 7px; border-radius: 999px; color: #082f49; background: #67e8f9; font-size: .75rem; font-weight: 700; vertical-align: middle; }
+.person-stars { color: #fbbf24 !important; font-size: .72rem !important; font-weight: 700 !important; }
+.star-mode-tag { display: inline-block; margin-left: 10px; padding: 3px 9px; border-radius: 999px; color: #fbbf24; background: rgba(251, 191, 36, .15); border: 1px solid rgba(251, 191, 36, .3); font-size: .75rem; font-weight: 700; vertical-align: middle; text-transform: none; }
 
 @media (max-width: 580px) {
   .dashboard-shell { background-position: 78% 40px; background-size: auto 88vh; }

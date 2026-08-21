@@ -10,6 +10,7 @@ recoveryCard.innerHTML = `<p class="eyebrow">SEGURANÇA</p><h2>Recuperar senha</
 configForm.closest(".setup-card").insertAdjacentElement("afterend", recoveryCard);
 const configRecoveryForm = document.querySelector("#config-recovery-form");
 const configRecoveryMessage = document.querySelector("#config-recovery-message");
+
 const tieBreakCard = document.createElement("section");
 tieBreakCard.className = "setup-card password-recovery-card";
 tieBreakCard.innerHTML = `<p class="eyebrow">RANKING</p><h2>Critério de desempate</h2><p>Escolha como as equipes empatadas em vitórias serão ordenadas.</p><form id="tie-break-form" class="config-account-form"><label for="tie-break-mode">Critério</label><select id="tie-break-mode"><option value="full">Vitórias, saldo e pontos</option><option value="wins">Apenas vitórias</option></select><p id="tie-break-message" class="auth-message" role="status"></p><button type="submit">Salvar critério</button></form>`;
@@ -22,6 +23,15 @@ const tieBreakVisibility = document.querySelector("#tie-break-visibility");
 const showPointsBalance = document.querySelector("#show-points-balance");
 tieBreakVisibility.insertAdjacentHTML("afterend", '<label class="switch-label"><input id="quick-winner-only" type="checkbox" /><span><strong>Jogo por Resultado sem placar</strong><small>Solicita apenas o vencedor de cada partida. Usa somente vitórias no ranking e oculta pontos e saldo.</small></span></label>');
 const quickWinnerOnly = document.querySelector("#quick-winner-only");
+
+const starDrawCard = document.createElement("section");
+starDrawCard.className = "setup-card password-recovery-card";
+starDrawCard.innerHTML = `<p class="eyebrow">GERADOR DE TIMES</p><h2>Modo de sorteio</h2><p>Escolha como o sorteio será realizado na área de gerar times.</p><form id="star-draw-form" class="config-account-form"><label class="switch-label"><input id="star-draw-enabled" type="checkbox" /><span><strong>Sorteio por estrela</strong><small>Troca a opção de cabeça de chave pelo sorteio baseado em estrelas (1 a 5 pontos) para equilibrar as equipes por nível.</small></span></label><p id="star-draw-message" class="auth-message" role="status"></p><button type="submit">Salvar modo de sorteio</button></form>`;
+tieBreakCard.insertAdjacentElement("afterend", starDrawCard);
+const starDrawForm = document.querySelector("#star-draw-form");
+const starDrawEnabled = document.querySelector("#star-draw-enabled");
+const starDrawMessage = document.querySelector("#star-draw-message");
+
 function updateTieBreakVisibility() {
   tieBreakVisibility.hidden = tieBreakMode.value !== "wins";
   if (quickWinnerOnly.checked) {
@@ -35,6 +45,8 @@ function updateTieBreakVisibility() {
   }
 }
 
+starDrawEnabled.checked = localStorage.getItem("volley-star-draw-enabled") === "true";
+
 if (configClient) {
   configClient.auth.getUser().then(({ data }) => {
     configUser = data.user;
@@ -45,6 +57,9 @@ if (configClient) {
     tieBreakMode.value = configUser.user_metadata?.tie_break_mode || localStorage.getItem("volley-tie-break-mode") || "full";
     showPointsBalance.checked = configUser.user_metadata?.show_points_balance === false;
     quickWinnerOnly.checked = configUser.user_metadata?.quick_winner_only === true;
+    const starDrawVal = configUser.user_metadata?.star_draw_enabled ?? (localStorage.getItem("volley-star-draw-enabled") === "true");
+    starDrawEnabled.checked = starDrawVal;
+    localStorage.setItem("volley-star-draw-enabled", String(starDrawVal));
     updateTieBreakVisibility();
   });
 }
@@ -78,6 +93,23 @@ tieBreakForm.addEventListener("submit", async (event) => {
 });
 tieBreakMode.addEventListener("change", updateTieBreakVisibility);
 quickWinnerOnly.addEventListener("change", updateTieBreakVisibility);
+
+starDrawForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const enabled = starDrawEnabled.checked;
+  localStorage.setItem("volley-star-draw-enabled", String(enabled));
+  if (configClient && configUser) {
+    const { data, error } = await configClient.auth.updateUser({ data: { ...(configUser.user_metadata || {}), star_draw_enabled: enabled } });
+    if (error) {
+      starDrawMessage.textContent = error.message;
+      starDrawMessage.className = "auth-message is-error";
+      return;
+    }
+    configUser = data.user;
+  }
+  starDrawMessage.textContent = enabled ? "Modo salvo: Sorteio por estrela ativado." : "Modo salvo: Sorteio por cabeça de chave ativado.";
+  starDrawMessage.className = "auth-message is-success";
+});
 
 configRecoveryForm.addEventListener("submit", async (event) => {
   event.preventDefault();
