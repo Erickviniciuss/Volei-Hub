@@ -13,6 +13,17 @@ const config = window.SUPABASE_CONFIG;
 const hasSupabaseKey = config?.anonKey && !config.anonKey.startsWith("COLE_A_CHAVE");
 const supabaseClient = hasSupabaseKey ? window.supabaseClient || null : null;
 
+function timingSafeEqualString(a, b) {
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  const lenA = a.length;
+  const lenB = b.length;
+  let mismatch = lenA ^ lenB;
+  for (let i = 0; i < lenA; i += 1) {
+    mismatch |= a.charCodeAt(i) ^ (i < lenB ? b.charCodeAt(i) : 0);
+  }
+  return mismatch === 0;
+}
+
 function setMessage(message, type = "") {
   authMessage.textContent = message;
   authMessage.className = `auth-message ${type}`;
@@ -98,7 +109,7 @@ passwordUpdateForm.addEventListener("submit", async (event) => {
   if (!await requireConfiguration()) return;
   const password = document.querySelector("#new-password").value;
   const confirmation = document.querySelector("#new-password-confirm").value;
-  if (password !== confirmation) { setMessage("As senhas precisam ser iguais.", "is-error"); return; }
+  if (!timingSafeEqualString(password, confirmation)) { setMessage("As senhas precisam ser iguais.", "is-error"); return; }
   const button = passwordUpdateForm.querySelector("button[type=submit]");
   button.disabled = true;
   const { error } = await supabaseClient.auth.updateUser({ password });
@@ -129,7 +140,7 @@ signupForm.addEventListener("submit", async (event) => {
   if (!await requireConfiguration()) return;
   const password = document.querySelector("#signup-password").value;
   const confirmation = document.querySelector("#signup-password-confirm").value;
-  if (password !== confirmation) {
+  if (!timingSafeEqualString(password, confirmation)) {
     setMessage("As senhas precisam ser iguais.", "is-error");
     return;
   }

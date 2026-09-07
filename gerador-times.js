@@ -26,10 +26,15 @@ if (window.supabaseClient) {
 }
 
 function escapeGenerator(value) { return String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#039;", '"': "&quot;" })[character]); }
+function cryptoRandom() {
+  const buffer = new Uint32Array(1);
+  (window.crypto || window.msCrypto).getRandomValues(buffer);
+  return buffer[0] / (0xffffffff + 1);
+}
 function shuffle(items) {
   const copy = [...items];
   for (let index = copy.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
+    const swapIndex = Math.floor(cryptoRandom() * (index + 1));
     [copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
   }
   return copy;
@@ -214,7 +219,7 @@ function drawBalancedTeamsByStars(people, teamCount, capacity) {
 
       const minSum = Math.min(...validTeams.map((t) => t.sum));
       const tiedTeams = validTeams.filter((t) => t.sum === minSum);
-      const chosen = tiedTeams[Math.floor(Math.random() * tiedTeams.length)];
+      const chosen = tiedTeams[Math.floor(cryptoRandom() * tiedTeams.length)];
       candidateTeams[chosen.index].push(person);
     });
 
@@ -296,7 +301,7 @@ function drawTeams() {
     const remaining = shuffle(people.filter((person) => !person.seedLevel));
     remaining.forEach((person) => {
       const available = teams.map((team, index) => ({ index, size: team.length })).filter(({ size }) => size < capacity);
-      teams[available[Math.floor(Math.random() * available.length)].index].push(person);
+      teams[available[Math.floor(cryptoRandom() * available.length)].index].push(person);
     });
   }
 
