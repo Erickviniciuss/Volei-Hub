@@ -382,8 +382,55 @@ peopleNames.addEventListener("click", (event) => {
   }
 });
 
+function parseTxtContent(text) {
+  const rawLines = text.split(/\r?\n/);
+  const names = [];
+  rawLines.forEach((line) => {
+    let cleaned = line.trim();
+    if (!cleaned) return;
+    cleaned = cleaned.replace(/^[\d\s.\-•)*]+/g, "").trim();
+    if (cleaned) names.push(cleaned);
+  });
+  return names;
+}
+
+function handleTxtImport(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const text = e.target.result || "";
+    const names = parseTxtContent(text);
+    if (!names.length) {
+      generatorMessage.textContent = "Nenhum nome válido encontrado no arquivo TXT.";
+      generatorMessage.className = "auth-message is-error";
+      return;
+    }
+    saveParticipantDraftFromInputs();
+    participantDraft = names.map((name) => ({ name, seedLevel: 0, stars: 3 }));
+    const perTeam = Math.max(1, Number(peoplePerTeam.value) || 4);
+    const requiredTeams = Math.ceil(names.length / perTeam);
+    if (requiredTeams > Number(teamTotal.value)) {
+      teamTotal.value = Math.min(7, requiredTeams);
+    }
+    renderPeopleInputs(false);
+    generatorMessage.textContent = `${names.length} ${names.length === 1 ? "participante importado" : "participantes importados"} do arquivo TXT com sucesso!`;
+    generatorMessage.className = "auth-message is-success";
+    event.target.value = "";
+  };
+  reader.readAsText(file);
+}
+
+const importTxtBtn = document.querySelector("#import-txt-btn");
+const importTxtFile = document.querySelector("#import-txt-file");
+if (importTxtBtn && importTxtFile) {
+  importTxtBtn.addEventListener("click", () => importTxtFile.click());
+  importTxtFile.addEventListener("change", handleTxtImport);
+}
+
 document.querySelector("#draw-teams").addEventListener("click", drawTeams);
 document.querySelector("#add-generator-person").addEventListener("click", addGeneratorPerson);
 document.querySelector("#remove-generator-person").addEventListener("click", removeGeneratorPerson);
 renderPeopleInputs();
+
 

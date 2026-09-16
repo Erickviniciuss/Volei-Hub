@@ -33,10 +33,19 @@ window.quickGameStore = {
       game_data: result,
     }, { onConflict: "user_id,local_id" });
   },
-  async getCloudResults() {
-    if (!cloudSupabase) return { data: [], error: new Error("Supabase não configurado") };
-    const { data, error } = await cloudSupabase.from("game_results").select("game_data").order("finished_at", { ascending: false });
-    return { data: (data || []).map((row) => row.game_data), error };
+  async getCloudResults(page = 0, limit = 5) {
+    if (!cloudSupabase) return { data: [], hasMore: false, error: new Error("Supabase não configurado") };
+    const from = page * limit;
+    const to = from + limit - 1;
+    const { data, count, error } = await cloudSupabase
+      .from("game_results")
+      .select("game_data", { count: "exact" })
+      .order("finished_at", { ascending: false })
+      .range(from, to);
+    const items = (data || []).map((row) => row.game_data);
+    const totalCount = count ?? 0;
+    const hasMore = (from + items.length) < totalCount;
+    return { data: items, hasMore, count: totalCount, error };
   },
   async deleteResultFromCloud(id) {
     if (!cloudSupabase) return { error: new Error("Supabase não configurado") };

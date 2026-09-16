@@ -440,6 +440,13 @@ button:hover { background: var(--purple-dark); transform: translateY(-1px); }
 .round-title span { color: var(--aqua); font: 700 .72rem "Outfit", sans-serif; letter-spacing: .08em; }
 .match { display: grid; grid-template-columns: 1fr 22px 1fr; align-items: center; min-height: 54px; padding: 0 16px; border-bottom: 1px solid var(--line); font-size: .95rem; font-weight: 600; }
 .match:last-child { border-bottom: 0; }
+.match.retro-match { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; padding: 10px 14px; min-height: 58px; }
+.retro-score-inputs { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.retro-score-inputs input { width: 46px; height: 46px; padding: 0; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--soft-card); font-family: "Outfit", sans-serif; font-size: 1.1rem; font-weight: 700; text-align: center; -webkit-appearance: none; appearance: none; touch-action: manipulation; box-shadow: none; }
+.retro-score-inputs input:focus { outline: none; border-color: var(--purple); box-shadow: 0 0 0 3px rgba(103, 232, 249, .3); }
+.retro-winner-inputs { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 4px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft-card); }
+.retro-winner-inputs legend { font-size: .68rem; color: var(--muted); padding: 0 4px; }
+.retro-winner-inputs label { display: flex; align-items: center; gap: 6px; padding: 6px 8px; min-height: 36px; border-radius: 6px; cursor: pointer; font-size: .78rem; touch-action: manipulation; }
 .team-dropdown { position: relative; min-width: 0; }
 .team-dropdown summary { overflow: hidden; padding: 1px 0; color: inherit; cursor: pointer; font: inherit; list-style: none; text-overflow: ellipsis; white-space: nowrap; }
 .team-dropdown summary::-webkit-details-marker { display: none; }
@@ -558,6 +565,9 @@ button:hover { background: var(--purple-dark); transform: translateY(-1px); }
   .score-card > span:last-child { text-align: right; }
   .score-inputs { gap: 4px; }
   .score-inputs input { width: 42px; height: 42px; font-size: 1rem; }
+  .match.retro-match { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 6px; padding: 12px 6px; }
+  .retro-score-inputs { gap: 4px; }
+  .retro-score-inputs input { width: 44px; height: 44px; font-size: 1.1rem; }
   .winner-inputs { min-width: 132px; flex-direction: column; gap: 3px; }
   .winner-inputs label { max-width: 132px; padding: 5px 6px; overflow: hidden; font-size: .67rem; text-overflow: ellipsis; white-space: nowrap; }
   .table-utility-actions { align-items: center; flex-direction: row; gap: 8px; }

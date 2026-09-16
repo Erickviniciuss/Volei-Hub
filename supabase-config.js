@@ -7,6 +7,6 @@ window.SUPABASE_CONFIG = {
 };
 
 // Instância única para manter sessão e estado de autenticação consistentes
-if (!window.supabaseClient && window.supabase && window.SUPABASE_CONFIG.anonKey && !window.SUPABASE_CONFIG.anonKey.startsWith("COLE_A_CHAVE")) {
+if (!window.supabaseClient && window.supabase && window.SUPABASE_CONFIG.anonKey && !window.SUPABASE_CONFIG.anonKey.startsWith("COLE_")) {
   window.supabaseClient = window.supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);
 }

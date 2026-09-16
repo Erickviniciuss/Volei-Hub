@@ -4,7 +4,9 @@ const resultsDateFilter = document.querySelector("#results-date-filter");
 const resultsTypeFilter = document.querySelector("#results-type-filter");
 let displayedResults = [];
 let allResults = [];
-let visibleResults = 5;
+let currentCloudPage = 0;
+let hasMoreCloudResults = false;
+const PAGE_SIZE = 5;
 
 function escapeResult(value) { return String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#039;", '"': "&quot;" })[char]); }
 function resultPdfFileName(date = new Date()) {
@@ -99,13 +101,12 @@ function renderResults() {
     resultsList.innerHTML = `<section class="empty-results"><h2>Nenhum jogo encerrado</h2><p>${message}</p></section>`;
     return;
   }
-  const visible = results.slice(0, visibleResults);
-  resultsList.innerHTML = visible.map((result) => {
+  resultsList.innerHTML = results.map((result) => {
     const date = new Date(result.finishedAt).toLocaleString("pt-BR");
     const topPlayer = resultGameType(result) === "points" ? pointPlayerRanking(result)[0] : null;
     const playerHighlight = topPlayer ? `<p class="result-top-player">Maior pontuador: <strong>${escapeResult(topPlayer.name)}</strong> · ${escapeResult(topPlayer.team)} · ${topPlayer.points} pontos</p>` : resultGameType(result) === "points" ? '<p class="result-top-player">Nenhum ponto individual foi registrado.</p>' : "";
     return `<article class="result-card"><div class="result-card-heading"><div><p class="eyebrow">${date}</p><span class="result-game-type ${resultGameType(result)}">${resultGameTypeLabel(result)}</span><h2>${escapeResult(result.reason)}</h2></div><div class="result-actions"><button class="print-result" type="button" data-id="${result.id}">Enviar PDF</button><button class="delete-result" type="button" data-id="${result.id}">Excluir</button></div></div><div class="result-ranking">${result.standings.map((team, index) => `<div><strong>${index + 1}º</strong>${resultLeader(team, result) ? '<span class="leader-crown" title="Líder">♛</span>' : ""}<span class="result-team-name">${escapeResult(team.name)}</span>${resultStats(team, result)}</div>`).join("")}</div>${playerHighlight}</article>`;
-  }).join("") + (visible.length < results.length ? '<button id="show-more-results" class="show-more-results" type="button">Mostrar mais</button>' : "");
+  }).join("") + (hasMoreCloudResults ? '<button id="show-more-results" class="show-more-results" type="button">Carregar mais</button>' : "");
 }
 
 async function printResult(result) {
@@ -212,7 +213,7 @@ async function printResult(result) {
 }
 
 resultsList.addEventListener("click", async (event) => {
-  if (event.target.closest("#show-more-results")) { visibleResults += 5; renderResults(); return; }
+  if (event.target.closest("#show-more-results")) { await loadMoreResults(); return; }
   const button = event.target.closest("button[data-id]"); if (!button) return;
   const id = Number(button.dataset.id); const result = displayedResults.find((item) => item.id === id); if (!result) return;
   if (button.classList.contains("delete-result") && window.confirm("Excluir este histórico de jogo?")) {
@@ -222,14 +223,30 @@ resultsList.addEventListener("click", async (event) => {
   } else if (button.classList.contains("print-result")) printResult(result);
 });
 
+async function loadMoreResults() {
+  const button = document.querySelector("#show-more-results");
+  if (button) {
+    button.textContent = "Carregando…";
+    button.disabled = true;
+  }
+  currentCloudPage += 1;
+  const { data: newCloudResults, hasMore, error } = await window.quickGameStore.getCloudResults(currentCloudPage, PAGE_SIZE);
+  hasMoreCloudResults = hasMore;
+  const existingIds = new Set(allResults.map((r) => String(r.id)));
+  const newUnique = (newCloudResults || []).filter((r) => !existingIds.has(String(r.id)));
+  allResults = [...allResults, ...newUnique].sort((a, b) => new Date(b.finishedAt) - new Date(a.finishedAt));
+  renderResults();
+}
+
 async function loadResults() {
+  currentCloudPage = 0;
   const localResults = window.quickGameStore.getResults();
   const syncResponses = await Promise.all(localResults.map((result) => window.quickGameStore.saveResultToCloud(result)));
-  const { data: cloudResults, error } = await window.quickGameStore.getCloudResults();
-  const merged = [...cloudResults, ...localResults.filter((local) => !cloudResults.some((cloud) => cloud.id === local.id))]
+  const { data: cloudResults, hasMore, error } = await window.quickGameStore.getCloudResults(0, PAGE_SIZE);
+  hasMoreCloudResults = hasMore;
+  const merged = [...cloudResults, ...localResults.filter((local) => !cloudResults.some((cloud) => String(cloud.id) === String(local.id)))]
     .sort((a, b) => new Date(b.finishedAt) - new Date(a.finishedAt));
   allResults = merged;
-  visibleResults = 5;
   renderResults();
   const syncError = syncResponses.find((response) => response?.error)?.error;
   if (error || syncError) {
@@ -242,8 +259,8 @@ async function loadResults() {
   }
 }
 
-resultsDateFilter.addEventListener("change", () => { visibleResults = 5; renderResults(); });
-resultsTypeFilter.addEventListener("change", () => { visibleResults = 5; renderResults(); });
-document.querySelector("#clear-results-filter").addEventListener("click", () => { resultsDateFilter.value = ""; resultsTypeFilter.value = "all"; visibleResults = 5; renderResults(); });
+resultsDateFilter.addEventListener("change", () => { renderResults(); });
+resultsTypeFilter.addEventListener("change", () => { renderResults(); });
+document.querySelector("#clear-results-filter").addEventListener("click", () => { resultsDateFilter.value = ""; resultsTypeFilter.value = "all"; renderResults(); });
 
 loadResults();
