@@ -105,7 +105,8 @@ function renderResults() {
     const date = new Date(result.finishedAt).toLocaleString("pt-BR");
     const topPlayer = resultGameType(result) === "points" ? pointPlayerRanking(result)[0] : null;
     const playerHighlight = topPlayer ? `<p class="result-top-player">Maior pontuador: <strong>${escapeResult(topPlayer.name)}</strong> · ${escapeResult(topPlayer.team)} · ${topPlayer.points} pontos</p>` : resultGameType(result) === "points" ? '<p class="result-top-player">Nenhum ponto individual foi registrado.</p>' : "";
-    return `<article class="result-card"><div class="result-card-heading"><div><p class="eyebrow">${date}</p><span class="result-game-type ${resultGameType(result)}">${resultGameTypeLabel(result)}</span><h2>${escapeResult(result.reason)}</h2></div><div class="result-actions"><button class="print-result" type="button" data-id="${result.id}">Enviar PDF</button><button class="delete-result" type="button" data-id="${result.id}">Excluir</button></div></div><div class="result-ranking">${result.standings.map((team, index) => `<div><strong>${index + 1}º</strong>${resultLeader(team, result) ? '<span class="leader-crown" title="Líder">♛</span>' : ""}<span class="result-team-name">${escapeResult(team.name)}</span>${resultStats(team, result)}</div>`).join("")}</div>${playerHighlight}</article>`;
+    const alertHtml = result.exclusionAlert ? `<div class="exclusion-alert-box">${escapeResult(result.exclusionAlert)}</div>` : "";
+    return `<article class="result-card"><div class="result-card-heading"><div><p class="eyebrow">${date}</p><span class="result-game-type ${resultGameType(result)}">${resultGameTypeLabel(result)}</span><h2>${escapeResult(result.reason)}</h2></div><div class="result-actions"><button class="print-result" type="button" data-id="${result.id}">Enviar PDF</button><button class="delete-result" type="button" data-id="${result.id}">Excluir</button></div></div>${alertHtml}<div class="result-ranking">${result.standings.map((team, index) => `<div><strong>${index + 1}º</strong>${resultLeader(team, result) ? '<span class="leader-crown" title="Líder">♛</span>' : ""}<span class="result-team-name">${escapeResult(team.name)}</span>${resultStats(team, result)}</div>`).join("")}</div>${playerHighlight}</article>`;
   }).join("") + (hasMoreCloudResults ? '<button id="show-more-results" class="show-more-results" type="button">Carregar mais</button>' : "");
 }
 
@@ -177,6 +178,16 @@ async function printResult(result) {
       const visual = resultVisualStats(result, team);
       drawRankingRow(showPointsBalance ? [`${index + 1}º`, team.name, visual.games, team.wins, visual.losses, team.points, `${team.difference >= 0 ? "+" : ""}${team.difference}`] : [`${index + 1}º`, team.name, visual.games, team.wins, visual.losses]);
     });
+    if (result.exclusionAlert) {
+      y += 2;
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(8.5);
+      pdf.setTextColor(180, 83, 9);
+      const alertLines = pdf.splitTextToSize(result.exclusionAlert, 175);
+      if (y + alertLines.length * 4.5 > 280) { pdf.addPage(); y = 18; }
+      pdf.text(alertLines, 18, y);
+      y += alertLines.length * 4.5 + 2;
+    }
     pdf.setTextColor(30, 41, 59);
     if (topPlayers.length) {
       y += 12; line("Top 10 jogadores", 15, true);
@@ -201,8 +212,31 @@ async function printResult(result) {
       y += 3;
     });
     const file = new File([pdf.output("blob")], resultPdfFileName(result.startedAt || result.finishedAt), { type: "application/pdf" });
+    const shareTitle = "Resultado - Vôlei Hub";
+
+    let rankingText = "";
+    if (result.standings && result.standings.length) {
+      rankingText = "\n\n*Classificação Final:*\n" + result.standings.slice(0, 5).map((team, idx) => {
+        const medals = ["🥇", "🥈", "🥉"];
+        const prefix = medals[idx] || `${idx + 1}º`;
+        return `${prefix} ${team.name} (${team.wins} vitórias)`;
+      }).join("\n");
+    }
+
+    const whatsappMsg = `🏆 *VÔLEI HUB - RESULTADO DE PARTIDA* 🏆\n${result.reason || "Histórico de jogo"}${rankingText}\n\n📎 O PDF completo foi baixado no dispositivo para envio!`;
+
+    if (window.openPdfShareModal) {
+      window.openPdfShareModal({
+        file,
+        title: shareTitle,
+        text: "Resultado da partida.",
+        whatsappText: whatsappMsg
+      });
+      return;
+    }
+
     if (navigator.canShare?.({ files: [file] })) {
-      try { await navigator.share({ title: "Resultado - Vôlei Hub", text: "Resultado da partida.", files: [file] }); return; }
+      try { await navigator.share({ title: shareTitle, text: "Resultado da partida.", files: [file] }); return; }
       catch (error) { if (error.name === "AbortError") return; }
     }
   }
@@ -212,13 +246,30 @@ async function printResult(result) {
   report.document.close(); window.setTimeout(() => { report.focus(); report.print(); }, 300);
 }
 
+function getGameStore() {
+  if (window.quickGameStore) return window.quickGameStore;
+  return {
+    getResults() {
+      try { return JSON.parse(localStorage.getItem("volley-hub-quick-game-results")) || []; } catch { return []; }
+    },
+    deleteResult(id) {
+      const results = this.getResults().filter((result) => result.id !== id);
+      localStorage.setItem("volley-hub-quick-game-results", JSON.stringify(results));
+    },
+    async saveResultToCloud() { return { error: null }; },
+    async getCloudResults() { return { data: [], hasMore: false, error: null }; },
+    async deleteResultFromCloud() { return { error: null }; }
+  };
+}
+
 resultsList.addEventListener("click", async (event) => {
   if (event.target.closest("#show-more-results")) { await loadMoreResults(); return; }
   const button = event.target.closest("button[data-id]"); if (!button) return;
   const id = Number(button.dataset.id); const result = displayedResults.find((item) => item.id === id); if (!result) return;
+  const store = getGameStore();
   if (button.classList.contains("delete-result") && window.confirm("Excluir este histórico de jogo?")) {
-    window.quickGameStore.deleteResult(id);
-    await window.quickGameStore.deleteResultFromCloud(id);
+    store.deleteResult(id);
+    await store.deleteResultFromCloud(id);
     await loadResults();
   } else if (button.classList.contains("print-result")) printResult(result);
 });
@@ -230,7 +281,8 @@ async function loadMoreResults() {
     button.disabled = true;
   }
   currentCloudPage += 1;
-  const { data: newCloudResults, hasMore, error } = await window.quickGameStore.getCloudResults(currentCloudPage, PAGE_SIZE);
+  const store = getGameStore();
+  const { data: newCloudResults, hasMore, error } = await store.getCloudResults(currentCloudPage, PAGE_SIZE);
   hasMoreCloudResults = hasMore;
   const existingIds = new Set(allResults.map((r) => String(r.id)));
   const newUnique = (newCloudResults || []).filter((r) => !existingIds.has(String(r.id)));
@@ -239,23 +291,31 @@ async function loadMoreResults() {
 }
 
 async function loadResults() {
-  currentCloudPage = 0;
-  const localResults = window.quickGameStore.getResults();
-  const syncResponses = await Promise.all(localResults.map((result) => window.quickGameStore.saveResultToCloud(result)));
-  const { data: cloudResults, hasMore, error } = await window.quickGameStore.getCloudResults(0, PAGE_SIZE);
-  hasMoreCloudResults = hasMore;
-  const merged = [...cloudResults, ...localResults.filter((local) => !cloudResults.some((cloud) => String(cloud.id) === String(local.id)))]
-    .sort((a, b) => new Date(b.finishedAt) - new Date(a.finishedAt));
-  allResults = merged;
-  renderResults();
-  const syncError = syncResponses.find((response) => response?.error)?.error;
-  if (error || syncError) {
-    resultSyncStatus.textContent = "Não foi possível sincronizar com o Supabase. Verifique se o script supabase-schema.sql foi executado no projeto.";
-    resultSyncStatus.className = "result-sync-status is-error";
-    console.warn("Resultados do Supabase indisponíveis.", error || syncError);
-  } else {
-    resultSyncStatus.textContent = cloudResults.length ? "Resultados sincronizados com sua conta." : "";
-    resultSyncStatus.className = "result-sync-status";
+  try {
+    currentCloudPage = 0;
+    const store = getGameStore();
+    const localResults = store.getResults();
+    const syncResponses = await Promise.all(localResults.map((result) => store.saveResultToCloud(result)));
+    const { data: cloudResults, hasMore, error } = await store.getCloudResults(0, PAGE_SIZE);
+    hasMoreCloudResults = hasMore;
+    const validCloudResults = Array.isArray(cloudResults) ? cloudResults : [];
+    const merged = [...validCloudResults, ...localResults.filter((local) => !validCloudResults.some((cloud) => String(cloud.id) === String(local.id)))]
+      .sort((a, b) => new Date(b.finishedAt) - new Date(a.finishedAt));
+    allResults = merged;
+    renderResults();
+    const syncError = syncResponses.find((response) => response?.error)?.error;
+    if (error || syncError) {
+      resultSyncStatus.textContent = "Não foi possível sincronizar com o Supabase. Verifique se o script supabase-schema.sql foi executado no projeto.";
+      resultSyncStatus.className = "result-sync-status is-error";
+      console.warn("Resultados do Supabase indisponíveis.", error || syncError);
+    } else {
+      resultSyncStatus.textContent = validCloudResults.length ? "Resultados sincronizados com sua conta." : "";
+      resultSyncStatus.className = "result-sync-status";
+    }
+  } catch (err) {
+    console.error("Erro ao carregar resultados:", err);
+  } finally {
+    document.body.classList.remove("app-loading");
   }
 }
 

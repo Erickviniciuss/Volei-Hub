@@ -1,36 +1,96 @@
 const config = window.SUPABASE_CONFIG;
 const configClient = config?.anonKey && !config.anonKey.startsWith("COLE_A_CHAVE") ? window.supabaseClient || null : null;
-const configForm = document.querySelector("#account-form");
-const configMessage = document.querySelector("#account-message");
+const nameInput = document.querySelector("#account-edit-name");
+const emailInput = document.querySelector("#account-edit-email");
+const accountCard = document.querySelector("#account-form")?.closest(".setup-card");
+const floatingSaveBar = document.querySelector("#floating-save-bar");
+const floatingSaveButton = document.querySelector("#floating-save-button");
+const configToast = document.querySelector("#config-toast");
 let configUser = null;
 
-const recoveryCard = document.createElement("section");
-recoveryCard.className = "setup-card password-recovery-card";
-recoveryCard.innerHTML = `<p class="eyebrow">SEGURANÇA</p><h2>Recuperar senha</h2><p>Enviaremos um link para criar uma nova senha no e-mail da sua conta.</p><form id="config-recovery-form" class="config-account-form"><label for="config-recovery-email">E-mail de recuperação</label><input id="config-recovery-email" type="email" readonly /><p id="config-recovery-message" class="auth-message" role="status"></p><button type="submit">Enviar e-mail de recuperação</button></form>`;
-configForm.closest(".setup-card").insertAdjacentElement("afterend", recoveryCard);
-const configRecoveryForm = document.querySelector("#config-recovery-form");
-const configRecoveryMessage = document.querySelector("#config-recovery-message");
-
+// Card 1: Ranking / Critério de Desempate
 const tieBreakCard = document.createElement("section");
-tieBreakCard.className = "setup-card password-recovery-card";
-tieBreakCard.innerHTML = `<p class="eyebrow">RANKING</p><h2>Critério de desempate</h2><p>Escolha como as equipes empatadas em vitórias serão ordenadas.</p><form id="tie-break-form" class="config-account-form"><label for="tie-break-mode">Critério</label><select id="tie-break-mode"><option value="full">Vitórias, saldo e pontos</option><option value="wins">Apenas vitórias</option></select><p id="tie-break-message" class="auth-message" role="status"></p><button type="submit">Salvar critério</button></form>`;
-recoveryCard.insertAdjacentElement("afterend", tieBreakCard);
-const tieBreakForm = document.querySelector("#tie-break-form");
+tieBreakCard.className = "setup-card config-card";
+tieBreakCard.innerHTML = `
+  <p class="eyebrow">RANKING</p>
+  <h2>Critério de desempate</h2>
+  <p>Escolha como as equipes empatadas em vitórias serão ordenadas.</p>
+  <div class="config-account-form">
+    <label for="tie-break-mode">Critério</label>
+    <select id="tie-break-mode">
+      <option value="full">Vitórias, saldo e pontos</option>
+      <option value="wins">Apenas vitórias</option>
+    </select>
+    <label id="tie-break-visibility" class="switch-label" hidden>
+      <input id="show-points-balance" type="checkbox" />
+      <span class="switch-ui" aria-hidden="true"></span>
+      <span>
+        <strong>Ocultar pontos e saldo</strong>
+        <small>Remove essas informações do ranking e dos PDFs.</small>
+      </span>
+    </label>
+    <label class="switch-label">
+      <input id="quick-winner-only" type="checkbox" />
+      <span class="switch-ui" aria-hidden="true"></span>
+      <span>
+        <strong>Jogo por Resultado sem placar</strong>
+        <small>Solicita apenas o vencedor de cada partida. Usa somente vitórias no ranking e oculta pontos e saldo.</small>
+      </span>
+    </label>
+  </div>
+`;
+if (accountCard) {
+  accountCard.insertAdjacentElement("afterend", tieBreakCard);
+}
+
 const tieBreakMode = document.querySelector("#tie-break-mode");
-const tieBreakMessage = document.querySelector("#tie-break-message");
-tieBreakMode.insertAdjacentHTML("afterend", '<label id="tie-break-visibility" class="switch-label" hidden><input id="show-points-balance" type="checkbox" /><span><strong>Ocultar pontos e saldo</strong><small>Remove essas informações do ranking e dos PDFs.</small></span></label>');
 const tieBreakVisibility = document.querySelector("#tie-break-visibility");
 const showPointsBalance = document.querySelector("#show-points-balance");
-tieBreakVisibility.insertAdjacentHTML("afterend", '<label class="switch-label"><input id="quick-winner-only" type="checkbox" /><span><strong>Jogo por Resultado sem placar</strong><small>Solicita apenas o vencedor de cada partida. Usa somente vitórias no ranking e oculta pontos e saldo.</small></span></label>');
 const quickWinnerOnly = document.querySelector("#quick-winner-only");
 
+// Card 2: Gerador de Times
 const starDrawCard = document.createElement("section");
-starDrawCard.className = "setup-card password-recovery-card";
-starDrawCard.innerHTML = `<p class="eyebrow">GERADOR DE TIMES</p><h2>Modo de sorteio</h2><p>Escolha como o sorteio será realizado na área de gerar times.</p><form id="star-draw-form" class="config-account-form"><label class="switch-label"><input id="star-draw-enabled" type="checkbox" /><span><strong>Sorteio por estrela</strong><small>Troca a opção de cabeça de chave pelo sorteio baseado em estrelas (1 a 5 pontos) para equilibrar as equipes por nível.</small></span></label><p id="star-draw-message" class="auth-message" role="status"></p><button type="submit">Salvar modo de sorteio</button></form>`;
+starDrawCard.className = "setup-card config-card";
+starDrawCard.innerHTML = `
+  <p class="eyebrow">GERADOR DE TIMES</p>
+  <h2>Modo de sorteio</h2>
+  <p>Escolha como o sorteio será realizado na área de gerar times.</p>
+  <div class="config-account-form">
+    <label class="switch-label">
+      <input id="star-draw-enabled" type="checkbox" />
+      <span class="switch-ui" aria-hidden="true"></span>
+      <span>
+        <strong>Sorteio por estrela</strong>
+        <small>Troca a opção de cabeça de chave pelo sorteio baseado em estrelas (1 a 5 pontos) para equilibrar as equipes por nível.</small>
+      </span>
+    </label>
+  </div>
+`;
 tieBreakCard.insertAdjacentElement("afterend", starDrawCard);
-const starDrawForm = document.querySelector("#star-draw-form");
+
 const starDrawEnabled = document.querySelector("#star-draw-enabled");
-const starDrawMessage = document.querySelector("#star-draw-message");
+
+// Card 3: Equilíbrio de Jogos
+const exclusionBalanceCard = document.createElement("section");
+exclusionBalanceCard.className = "setup-card config-card";
+exclusionBalanceCard.innerHTML = `
+  <p class="eyebrow">EQUILÍBRIO DE JOGOS</p>
+  <h2>Equilíbrio por Exclusão de Jogo</h2>
+  <p>Escolha se a última partida do líder será desconsiderada caso ele tenha mais jogos disputados que o 2º colocado no término da partida.</p>
+  <div class="config-account-form">
+    <label class="switch-label">
+      <input id="exclusion-balance-enabled" type="checkbox" />
+      <span class="switch-ui" aria-hidden="true"></span>
+      <span>
+        <strong>Equilíbrio por Exclusão de jogo</strong>
+        <small>Desconsidera a última partida disputada pelo líder caso ele tenha mais jogos jogados que o 2º colocado ao encerrar o campeonato.</small>
+      </span>
+    </label>
+  </div>
+`;
+starDrawCard.insertAdjacentElement("afterend", exclusionBalanceCard);
+
+const exclusionBalanceEnabled = document.querySelector("#exclusion-balance-enabled");
 
 function updateTieBreakVisibility() {
   tieBreakVisibility.hidden = tieBreakMode.value !== "wins";
@@ -45,88 +105,190 @@ function updateTieBreakVisibility() {
   }
 }
 
-starDrawEnabled.checked = localStorage.getItem("volley-star-draw-enabled") === "true";
+// Initial values loaded from localStorage (canonical fallback)
+let savedState = {
+  name: "",
+  email: "",
+  tieBreakMode: localStorage.getItem("volley-tie-break-mode") || "full",
+  showPointsBalance: localStorage.getItem("volley-show-points-balance") === "false",
+  quickWinnerOnly: false,
+  starDrawEnabled: localStorage.getItem("volley-star-draw-enabled") === "true",
+  exclusionBalanceEnabled: localStorage.getItem("volley-exclusion-balance-enabled") === "true"
+};
 
+// Apply initial state to form
+function applyStateToForm(state) {
+  if (nameInput) nameInput.value = state.name || "";
+  if (emailInput) emailInput.value = state.email || "";
+  if (tieBreakMode) tieBreakMode.value = state.tieBreakMode || "full";
+  if (showPointsBalance) showPointsBalance.checked = !!state.showPointsBalance;
+  if (quickWinnerOnly) quickWinnerOnly.checked = !!state.quickWinnerOnly;
+  if (starDrawEnabled) starDrawEnabled.checked = !!state.starDrawEnabled;
+  if (exclusionBalanceEnabled) exclusionBalanceEnabled.checked = !!state.exclusionBalanceEnabled;
+  updateTieBreakVisibility();
+}
+
+applyStateToForm(savedState);
+
+function getCurrentState() {
+  return {
+    name: nameInput ? nameInput.value.trim() : "",
+    email: emailInput ? emailInput.value.trim() : "",
+    tieBreakMode: tieBreakMode ? tieBreakMode.value : "full",
+    showPointsBalance: showPointsBalance ? showPointsBalance.checked : false,
+    quickWinnerOnly: quickWinnerOnly ? quickWinnerOnly.checked : false,
+    starDrawEnabled: starDrawEnabled ? starDrawEnabled.checked : false,
+    exclusionBalanceEnabled: exclusionBalanceEnabled ? exclusionBalanceEnabled.checked : false
+  };
+}
+
+function hasChanges() {
+  const current = getCurrentState();
+  return (
+    current.name !== savedState.name ||
+    current.email !== savedState.email ||
+    current.tieBreakMode !== savedState.tieBreakMode ||
+    current.showPointsBalance !== savedState.showPointsBalance ||
+    current.quickWinnerOnly !== savedState.quickWinnerOnly ||
+    current.starDrawEnabled !== savedState.starDrawEnabled ||
+    current.exclusionBalanceEnabled !== savedState.exclusionBalanceEnabled
+  );
+}
+
+function checkChanges() {
+  if (!floatingSaveBar) return;
+  if (hasChanges()) {
+    floatingSaveBar.classList.add("is-visible");
+  } else {
+    floatingSaveBar.classList.remove("is-visible");
+  }
+}
+
+// Listen for any change in any input
+[nameInput, emailInput].forEach((input) => {
+  if (input) {
+    input.addEventListener("input", checkChanges);
+    input.addEventListener("change", checkChanges);
+  }
+});
+
+[tieBreakMode, showPointsBalance, quickWinnerOnly, starDrawEnabled, exclusionBalanceEnabled].forEach((control) => {
+  if (control) {
+    control.addEventListener("change", () => {
+      if (control === quickWinnerOnly || control === tieBreakMode) {
+        updateTieBreakVisibility();
+      }
+      checkChanges();
+    });
+  }
+});
+
+// Load user from Supabase if available
 if (configClient) {
   configClient.auth.getUser().then(({ data }) => {
     configUser = data.user;
     if (!configUser) return;
-    document.querySelector("#account-edit-name").value = configUser.user_metadata?.display_name || "";
-    document.querySelector("#account-edit-email").value = configUser.email || "";
-    document.querySelector("#config-recovery-email").value = configUser.email || "";
-    tieBreakMode.value = configUser.user_metadata?.tie_break_mode || localStorage.getItem("volley-tie-break-mode") || "full";
-    showPointsBalance.checked = configUser.user_metadata?.show_points_balance === false;
-    quickWinnerOnly.checked = configUser.user_metadata?.quick_winner_only === true;
-    const starDrawVal = configUser.user_metadata?.star_draw_enabled ?? (localStorage.getItem("volley-star-draw-enabled") === "true");
-    starDrawEnabled.checked = starDrawVal;
-    localStorage.setItem("volley-star-draw-enabled", String(starDrawVal));
-    updateTieBreakVisibility();
+
+    savedState = {
+      name: configUser.user_metadata?.display_name || "",
+      email: configUser.email || "",
+      tieBreakMode: configUser.user_metadata?.tie_break_mode || localStorage.getItem("volley-tie-break-mode") || "full",
+      showPointsBalance: configUser.user_metadata?.show_points_balance === false,
+      quickWinnerOnly: configUser.user_metadata?.quick_winner_only === true,
+      starDrawEnabled: configUser.user_metadata?.star_draw_enabled ?? (localStorage.getItem("volley-star-draw-enabled") === "true"),
+      exclusionBalanceEnabled: configUser.user_metadata?.exclusion_balance_enabled ?? (localStorage.getItem("volley-exclusion-balance-enabled") === "true")
+    };
+
+    applyStateToForm(savedState);
+    checkChanges();
   });
 }
 
-configForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  if (!configClient || !configUser) return;
-  const name = document.querySelector("#account-edit-name").value.trim();
-  const email = document.querySelector("#account-edit-email").value.trim();
-  const emailChanged = email !== configUser.email;
-  const { data, error } = await configClient.auth.updateUser({ email, data: { display_name: name } });
-  if (error) { configMessage.textContent = error.message; configMessage.className = "auth-message is-error"; return; }
-  configUser = data.user;
-  configMessage.textContent = emailChanged ? "Cadastro salvo. Confirme o novo e-mail, se solicitado." : "Cadastro salvo.";
-  configMessage.className = "auth-message is-success";
-});
+// Toast helper
+let toastTimer = null;
+function showToast(message, type = "success") {
+  if (!configToast) return;
+  configToast.textContent = message;
+  configToast.className = `config-toast is-visible is-${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    configToast.classList.remove("is-visible");
+  }, 3500);
+}
 
-tieBreakForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  if (!configClient || !configUser) return;
-  const winnerOnly = quickWinnerOnly.checked;
-  const mode = winnerOnly || tieBreakMode.value === "wins" ? "wins" : "full";
-  const visible = winnerOnly ? false : mode !== "wins" || !showPointsBalance.checked;
-  const { data, error } = await configClient.auth.updateUser({ data: { ...(configUser.user_metadata || {}), tie_break_mode: mode, show_points_balance: visible, quick_winner_only: winnerOnly } });
-  if (error) { tieBreakMessage.textContent = error.message; tieBreakMessage.className = "auth-message is-error"; return; }
-  configUser = data.user;
-  localStorage.setItem("volley-tie-break-mode", mode);
-  localStorage.setItem("volley-show-points-balance", String(visible));
-  tieBreakMessage.textContent = winnerOnly ? "Modo sem placar salvo: informe apenas o vencedor de cada partida." : mode === "wins" ? (visible ? "Critério salvo: pontos e saldo continuam visíveis." : "Critério salvo: pontos e saldo foram ocultados.") : "Critério salvo: vitórias, saldo e pontos.";
-  tieBreakMessage.className = "auth-message is-success";
-});
-tieBreakMode.addEventListener("change", updateTieBreakVisibility);
-quickWinnerOnly.addEventListener("change", updateTieBreakVisibility);
+// Save all settings handler
+async function saveAllSettings() {
+  if (!hasChanges()) return;
 
-starDrawForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const enabled = starDrawEnabled.checked;
-  localStorage.setItem("volley-star-draw-enabled", String(enabled));
-  if (configClient && configUser) {
-    const { data, error } = await configClient.auth.updateUser({ data: { ...(configUser.user_metadata || {}), star_draw_enabled: enabled } });
-    if (error) {
-      starDrawMessage.textContent = error.message;
-      starDrawMessage.className = "auth-message is-error";
-      return;
-    }
-    configUser = data.user;
-  }
-  starDrawMessage.textContent = enabled ? "Modo salvo: Sorteio por estrela ativado." : "Modo salvo: Sorteio por cabeça de chave ativado.";
-  starDrawMessage.className = "auth-message is-success";
-});
+  const current = getCurrentState();
 
-configRecoveryForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  if (!configClient || !configUser) return;
-  const button = configRecoveryForm.querySelector("button");
-  button.disabled = true;
-  configRecoveryMessage.textContent = "Enviando e-mail de recuperação…";
-  configRecoveryMessage.className = "auth-message";
-  const { error } = await configClient.auth.resetPasswordForEmail(configUser.email, {
-    redirectTo: new URL("login.html", window.location.href).href,
-  });
-  button.disabled = false;
-  if (error) {
-    configRecoveryMessage.textContent = error.message;
-    configRecoveryMessage.className = "auth-message is-error";
+  if (nameInput && (!current.name || current.name.length < 2)) {
+    showToast("O nome da conta deve ter no mínimo 2 caracteres.", "error");
+    nameInput.focus();
     return;
   }
-  configRecoveryMessage.textContent = "E-mail enviado. Abra o link recebido para criar uma nova senha.";
-  configRecoveryMessage.className = "auth-message is-success";
-});
+
+  if (emailInput && (!current.email || !current.email.includes("@"))) {
+    showToast("Por favor, informe um e-mail válido.", "error");
+    emailInput.focus();
+    return;
+  }
+
+  if (floatingSaveButton) {
+    floatingSaveButton.disabled = true;
+    floatingSaveButton.innerHTML = `<span class="save-spinner"></span><span>Salvando…</span>`;
+  }
+
+  try {
+    const winnerOnly = current.quickWinnerOnly;
+    const mode = winnerOnly || current.tieBreakMode === "wins" ? "wins" : "full";
+    const visible = winnerOnly ? false : mode !== "wins" || !current.showPointsBalance;
+
+    if (configClient && configUser) {
+      const emailChanged = current.email !== configUser.email;
+      const updates = {
+        data: {
+          ...(configUser.user_metadata || {}),
+          display_name: current.name,
+          tie_break_mode: mode,
+          show_points_balance: visible,
+          quick_winner_only: winnerOnly,
+          star_draw_enabled: current.starDrawEnabled,
+          exclusion_balance_enabled: current.exclusionBalanceEnabled
+        }
+      };
+      if (emailChanged) {
+        updates.email = current.email;
+      }
+
+      const { data, error } = await configClient.auth.updateUser(updates);
+      if (error) throw error;
+      configUser = data.user;
+    }
+
+    // Persist only upon explicit save
+    localStorage.setItem("volley-tie-break-mode", mode);
+    localStorage.setItem("volley-show-points-balance", String(visible));
+    localStorage.setItem("volley-star-draw-enabled", String(current.starDrawEnabled));
+    localStorage.setItem("volley-exclusion-balance-enabled", String(current.exclusionBalanceEnabled));
+
+    savedState = { ...current };
+
+    if (floatingSaveBar) {
+      floatingSaveBar.classList.remove("is-visible");
+    }
+
+    showToast("Configurações salvas com sucesso!", "success");
+  } catch (err) {
+    showToast(err.message || "Erro ao salvar configurações.", "error");
+  } finally {
+    if (floatingSaveButton) {
+      floatingSaveButton.disabled = false;
+      floatingSaveButton.innerHTML = `<span class="save-icon" aria-hidden="true">✓</span><span>Salvar</span>`;
+    }
+  }
+}
+
+if (floatingSaveButton) {
+  floatingSaveButton.addEventListener("click", saveAllSettings);
+}

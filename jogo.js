@@ -207,7 +207,8 @@ function showQuickFinished(result) {
   quickFinished.hidden = false;
   document.querySelector("#finished-copy").textContent = result.reason || "O jogo foi encerrado.";
   const standings = result.standings || [];
-  document.querySelector("#finished-ranking").innerHTML = `<h3>Classificação final</h3><div class="ranking-list">${standings.map((team, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong><span>${escapeQuick(team.name)}</span>${rankingStats(team)}</div>`).join("")}</div>`;
+  const alertHtml = result.exclusionAlert ? `<div class="exclusion-alert-box">${escapeQuick(result.exclusionAlert)}</div>` : "";
+  document.querySelector("#finished-ranking").innerHTML = `<h3>Classificação final</h3>${alertHtml}<div class="ranking-list">${standings.map((team, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong><span>${escapeQuick(team.name)}</span>${rankingStats(team)}</div>`).join("")}</div>`;
 }
 function watchQuickGame() {
   if (quickLiveChannel) window.quickGameStore.unsubscribeLiveGame(quickLiveChannel);
@@ -240,13 +241,15 @@ function saveQuickGame() {
   }).catch((error) => console.warn("Não foi possível atualizar o acompanhamento ao vivo.", error));
 }
 
-function buildStandings() {
+function buildStandings(excludeKey = null) {
   const names = new Set(currentTeams);
   quickSchedule.forEach((round) => round.matches.forEach(([home, away]) => { names.add(home); names.add(away); }));
   const standings = [...names].map((name) => ({ name, games: 0, wins: 0, losses: 0, points: 0, conceded: 0, difference: 0 }));
   const byName = new Map(standings.map((team) => [team.name, team]));
   quickSchedule.forEach((round, roundIndex) => round.matches.forEach(([home, away], gameIndex) => {
-    const score = scores.get(scoreKey(roundIndex, gameIndex));
+    const key = scoreKey(roundIndex, gameIndex);
+    if (excludeKey && key === excludeKey) return;
+    const score = scores.get(key);
     if (!score || score[0] === "" || score[1] === "") return;
     const homePoints = Number(score[0]); const awayPoints = Number(score[1]);
     const homeTeam = byName.get(home); const awayTeam = byName.get(away);
@@ -477,8 +480,19 @@ async function printQuickGamePdf() {
       y += 3;
     });
     const file = new File([pdf.output("blob")], gamePdfFileName(gameStartedAt || new Date()), { type: "application/pdf" });
+    const shareTitle = "Tabelas do Jogo por Resultado - Vôlei Hub";
+    const whatsappMsg = `🏐 *VÔLEI HUB - TABELAS DE JOGOS* 🏐\nModalidade: Jogo por Resultado\n📅 ${new Date().toLocaleDateString("pt-BR")}\n\n📎 O PDF completo foi baixado no dispositivo para envio!`;
+    if (window.openPdfShareModal) {
+      window.openPdfShareModal({
+        file,
+        title: shareTitle,
+        text: "Tabelas de jogos do Vôlei Hub.",
+        whatsappText: whatsappMsg
+      });
+      return;
+    }
     if (navigator.canShare?.({ files: [file] })) {
-      try { await navigator.share({ title: "Tabelas do Jogo por Resultado", text: "Tabelas de jogos do Vôlei Hub.", files: [file] }); return; }
+      try { await navigator.share({ title: shareTitle, text: "Tabelas de jogos do Vôlei Hub.", files: [file] }); return; }
       catch (error) { if (error.name === "AbortError") return; }
     }
   }
@@ -492,8 +506,38 @@ async function printQuickGamePdf() {
 }
 
 async function finishQuickGame(message) {
-  const standings = buildStandings();
-  const result = { id: Date.now(), gameType: "result", tieBreakMode: quickTieBreakMode, startedAt: gameStartedAt, finishedAt: new Date().toISOString(), reason: message, standings, schedule: quickSchedule, scores: [...scores.entries()], teams: currentTeams, players: currentPlayers, playerCount: currentPlayerCount };
+  let standings = buildStandings();
+  let exclusionAlert = null;
+  const exclusionEnabled = localStorage.getItem("volley-exclusion-balance-enabled") === "true";
+
+  if (exclusionEnabled && standings.length >= 2) {
+    const leader = standings[0];
+    const runnerUp = standings[1];
+    if (leader.games > runnerUp.games) {
+      let leaderLastKey = null;
+      for (let rIndex = quickSchedule.length - 1; rIndex >= 0; rIndex -= 1) {
+        const round = quickSchedule[rIndex];
+        for (let mIndex = round.matches.length - 1; mIndex >= 0; mIndex -= 1) {
+          const [home, away] = round.matches[mIndex];
+          if (home === leader.name || away === leader.name) {
+            const key = scoreKey(rIndex, mIndex);
+            const sc = scores.get(key);
+            if (sc && sc[0] !== "" && sc[1] !== "") {
+              leaderLastKey = key;
+              break;
+            }
+          }
+        }
+        if (leaderLastKey) break;
+      }
+      if (leaderLastKey) {
+        standings = buildStandings(leaderLastKey);
+        exclusionAlert = `⚠️ Equilíbrio por Exclusão de Jogo Aplicado: A equipe ${leader.name} (1º lugar) possuía ${leader.games} jogos disputados, enquanto a 2ª colocada (${runnerUp.name}) possuía ${runnerUp.games} jogos. O último jogo da equipe ${leader.name} foi desconsiderado e a classificação foi recomputada.`;
+      }
+    }
+  }
+
+  const result = { id: Date.now(), gameType: "result", tieBreakMode: quickTieBreakMode, startedAt: gameStartedAt, finishedAt: new Date().toISOString(), reason: message, standings, schedule: quickSchedule, scores: [...scores.entries()], teams: currentTeams, players: currentPlayers, playerCount: currentPlayerCount, exclusionAlert };
   result.showPointsBalance = quickShowPointsBalance;
   finishedQuickResult = result;
   window.quickGameStore.addResult(result);
@@ -504,9 +548,6 @@ async function finishQuickGame(message) {
   await window.quickGameStore.finishLiveGame(currentShareCode, result);
   showQuickFinished(result);
   return;
-  quickGame.hidden = true; overview.hidden = true; quickFinished.hidden = false;
-  document.querySelector("#finished-copy").textContent = message;
-  document.querySelector("#finished-ranking").innerHTML = `<h3>Classificação final</h3><div class="ranking-list">${standings.map((team, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong><span>${escapeQuick(team.name)}</span>${rankingStats(team)}</div>`).join("")}</div>`;
 }
 
 function printFinishedQuickResultLegacy() {
@@ -553,6 +594,16 @@ async function printFinishedQuickResult() {
   line("VÔLEI HUB", 12, true); line("Resultado de partida", 20, true); line(result.reason); y += 3;
   line("Classificação final", 15, true); tableRow(headers, true);
   result.standings.forEach((team, index) => tableRow(showPointsBalance ? [`${index + 1}º`, team.name, team.games, team.wins, team.losses, team.points, `${team.difference >= 0 ? "+" : ""}${team.difference}`] : [`${index + 1}º`, team.name, team.games, team.wins, team.losses]));
+  if (result.exclusionAlert) {
+    y += 2;
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(8.5);
+    pdf.setTextColor(180, 83, 9);
+    const alertLines = pdf.splitTextToSize(result.exclusionAlert, 175);
+    if (y + alertLines.length * 4.5 > 280) { pdf.addPage(); y = 18; }
+    pdf.text(alertLines, 18, y);
+    y += alertLines.length * 4.5 + 2;
+  }
   y += 8; line("Jogos por rodada", 15, true);
   playedRounds.forEach(({ round, index }) => {
     line(`Rodada ${index + 1}`, 13, true);
@@ -561,8 +612,31 @@ async function printFinishedQuickResult() {
   });
   const filename = gamePdfFileName(result.startedAt || result.finishedAt);
   const file = new File([pdf.output("blob")], filename, { type: "application/pdf" });
+  const shareTitle = "Resultado - Vôlei Hub";
+
+  let rankingText = "";
+  if (result.standings && result.standings.length) {
+    rankingText = "\n\n*Classificação Final:*\n" + result.standings.slice(0, 5).map((team, idx) => {
+      const medals = ["🥇", "🥈", "🥉"];
+      const prefix = medals[idx] || `${idx + 1}º`;
+      return `${prefix} ${team.name} (${team.wins} vitórias)`;
+    }).join("\n");
+  }
+
+  const whatsappMsg = `🏆 *VÔLEI HUB - RESULTADO DO JOGO* 🏆\n${result.reason || "Partida finalizada"}${rankingText}\n\n📎 O relatório completo em PDF foi baixado no dispositivo para envio!`;
+
+  if (window.openPdfShareModal) {
+    window.openPdfShareModal({
+      file,
+      title: shareTitle,
+      text: "Resultado da partida.",
+      whatsappText: whatsappMsg
+    });
+    return;
+  }
+
   if (navigator.canShare?.({ files: [file] })) {
-    try { await navigator.share({ title: "Resultado - Vôlei Hub", text: "Resultado da partida.", files: [file] }); return; }
+    try { await navigator.share({ title: shareTitle, text: "Resultado da partida.", files: [file] }); return; }
     catch (error) { if (error.name === "AbortError") return; }
   }
   pdf.save(filename);

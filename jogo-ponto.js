@@ -149,12 +149,13 @@ function readPointSetup() {
   return pointRequireNames.checked || pointRoster.every((team) => team.length >= 1);
 }
 
-function getPointStandings() {
+function getPointStandings(excludeKey = null) {
   const names = new Set(pointTeams);
   pointSchedule.forEach((round) => round.matches.forEach(([home, away]) => { names.add(home); names.add(away); }));
   const standings = [...names].map((name) => ({ name, games: 0, wins: 0, losses: 0, points: 0, conceded: 0, difference: 0 }));
   const byName = new Map(standings.map((team) => [team.name, team]));
   pointScores.forEach((score, key) => {
+    if (excludeKey && key === excludeKey) return;
     if (!score.finished || !score.confirmed) return;
     const [round, match] = key.split("-").map(Number);
     const [home, away] = pointSchedule[round].matches[match];
@@ -436,7 +437,18 @@ async function printPointGamePdf() {
     line("VÔLEI HUB", 12, true); line("Tabelas do Jogo Ponto a Ponto", 20, true);
     pointSchedule.forEach((round, roundIndex) => { line(`Rodada ${roundIndex + 1}`, 13, true); round.matches.forEach(([home, away], matchIndex) => { const score = pointScores.get(pointKey(roundIndex, matchIndex)); line(`${home}    ${score ? `${score.home} × ${score.away}` : "×"}    ${away}`); }); if (round.bye) line(`Folga: ${round.bye}`, 9); y += 3; });
     const file = new File([pdf.output("blob")], pointPdfFileName(), { type: "application/pdf" });
-    if (navigator.canShare?.({ files: [file] })) { try { await navigator.share({ title: "Tabelas do Jogo Ponto a Ponto", text: "Tabelas de jogos do Vôlei Hub.", files: [file] }); return; } catch (error) { if (error.name === "AbortError") return; } }
+    const shareTitle = "Tabelas do Jogo Ponto a Ponto - Vôlei Hub";
+    const whatsappMsg = `🏐 *VÔLEI HUB - JOGO PONTO A PONTO* 🏐\n📅 ${new Date().toLocaleDateString("pt-BR")}\nTabelas e confrontos da partida.\n\n📎 O PDF completo foi baixado no dispositivo para envio!`;
+    if (window.openPdfShareModal) {
+      window.openPdfShareModal({
+        file,
+        title: shareTitle,
+        text: "Tabelas de jogos do Vôlei Hub.",
+        whatsappText: whatsappMsg
+      });
+      return;
+    }
+    if (navigator.canShare?.({ files: [file] })) { try { await navigator.share({ title: shareTitle, text: "Tabelas de jogos do Vôlei Hub.", files: [file] }); return; } catch (error) { if (error.name === "AbortError") return; } }
   }
   const report = window.open("", "_blank");
   if (!report) { window.alert("Permita a abertura de janelas para enviar o PDF."); return; }
@@ -490,9 +502,10 @@ function showPointFinished(result) {
   document.querySelector("#point-finished-copy").textContent = result.reason || "O jogo foi encerrado.";
   const standings = result.standings || [];
   const playerStandings = result.playerStandings || [];
+  const alertHtml = result.exclusionAlert ? `<div class="exclusion-alert-box">${escapePoint(result.exclusionAlert)}</div>` : "";
   const teamRows = standings.map((team, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong><span>${escapePoint(team.name)}</span><small class="ranking-stats"><span><b>Vit.</b>${team.wins}</span><span><b>Der.</b>${team.losses}</span><span><b>Jogos</b>${team.games}</span><span><b>Pontos</b>${team.points}</span><span><b>Saldo</b>${team.difference >= 0 ? "+" : ""}${team.difference}</span></small></div>`).join("");
   const playerRows = playerStandings.length ? playerStandings.slice(0, 10).map((player, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong><span>${escapePoint(player.name)} <small>(${escapePoint(player.team)})</small></span><small class="ranking-stats"><span><b>Pontos</b>${player.points}</span></small></div>`).join("") : "<p>Nenhum ponto individual foi registrado.</p>";
-  document.querySelector("#point-finished-ranking").innerHTML = `<h3>Classificação final</h3><div class="ranking-list">${teamRows}</div>`;
+  document.querySelector("#point-finished-ranking").innerHTML = `<h3>Classificação final</h3>${alertHtml}<div class="ranking-list">${teamRows}</div>`;
   document.querySelector("#point-player-ranking").innerHTML = `<h3>Top 10 jogadores que mais pontuaram</h3><div class="ranking-list">${playerRows}</div>`;
   renderPointFinishedHistory();
   document.querySelector("#point-finished-history").hidden = true;
@@ -510,9 +523,39 @@ async function refreshPointTieBreakMode() {
   document.body.classList.toggle("hide-team-points-balance", !pointShowPointsBalance);
 }
 async function finishPointGame(message) {
-  const standings = getPointStandings();
+  let standings = getPointStandings();
+  let exclusionAlert = null;
+  const exclusionEnabled = localStorage.getItem("volley-exclusion-balance-enabled") === "true";
+
+  if (exclusionEnabled && standings.length >= 2) {
+    const leader = standings[0];
+    const runnerUp = standings[1];
+    if (leader.games > runnerUp.games) {
+      let leaderLastKey = null;
+      for (let rIndex = pointSchedule.length - 1; rIndex >= 0; rIndex -= 1) {
+        const round = pointSchedule[rIndex];
+        for (let mIndex = round.matches.length - 1; mIndex >= 0; mIndex -= 1) {
+          const [home, away] = round.matches[mIndex];
+          if (home === leader.name || away === leader.name) {
+            const key = pointKey(rIndex, mIndex);
+            const sc = pointScores.get(key);
+            if (sc && sc.finished && sc.confirmed) {
+              leaderLastKey = key;
+              break;
+            }
+          }
+        }
+        if (leaderLastKey) break;
+      }
+      if (leaderLastKey) {
+        standings = getPointStandings(leaderLastKey);
+        exclusionAlert = `⚠️ Equilíbrio por Exclusão de Jogo Aplicado: A equipe ${leader.name} (1º lugar) possuía ${leader.games} jogos disputados, enquanto a 2ª colocada (${runnerUp.name}) possuía ${runnerUp.games} jogos. O último jogo da equipe ${leader.name} foi desconsiderado e a classificação foi recomputada.`;
+      }
+    }
+  }
+
   const playerStandings = pointPlayerStandings();
-  const result = { id: Date.now(), gameType: "points", tieBreakMode: pointTieBreakMode, startedAt: pointStartedAt, finishedAt: new Date().toISOString(), reason: message, standings, playerStandings, schedule: pointSchedule, scores: [...pointScores.entries()].map(([key, score]) => [key, [String(score.home), String(score.away)]]), teams: pointTeams, players: pointRoster, playerCount: pointCurrentPlayerCount, pointHistory: [...pointHistory.entries()] };
+  const result = { id: Date.now(), gameType: "points", tieBreakMode: pointTieBreakMode, startedAt: pointStartedAt, finishedAt: new Date().toISOString(), reason: message, standings, playerStandings, schedule: pointSchedule, scores: [...pointScores.entries()].map(([key, score]) => [key, [String(score.home), String(score.away)]]), teams: pointTeams, players: pointRoster, playerCount: pointCurrentPlayerCount, pointHistory: [...pointHistory.entries()], exclusionAlert };
   result.showPointsBalance = pointShowPointsBalance;
   finishedPointResult = result;
   window.quickGameStore.addResult(result);
@@ -523,16 +566,6 @@ async function finishPointGame(message) {
   await window.quickGameStore.finishLiveGame(pointShareCode, result);
   showPointFinished(result);
   return;
-  document.querySelector("#point-game").hidden = true;
-  document.querySelector("#point-overview").hidden = true;
-  document.querySelector("#point-finished").hidden = false;
-  document.querySelector("#point-finished-copy").textContent = message;
-  document.querySelector("#point-finished-ranking").innerHTML = `<h3>Classificação final</h3><div class="ranking-list">${standings.map((team, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong><span>${escapePoint(team.name)}</span><small class="ranking-stats"><span><b>Vit.</b>${team.wins}</span><span><b>Der.</b>${team.losses}</span><span><b>Jogos</b>${team.games}</span><span><b>Pontos</b>${team.points}</span><span><b>Saldo</b>${team.difference >= 0 ? "+" : ""}${team.difference}</span></small></div>`).join("")}</div>`;
-  document.querySelector("#point-player-ranking").innerHTML = `<h3>Top 10 jogadores que mais pontuaram</h3><div class="ranking-list">${playerStandings.length ? playerStandings.slice(0, 10).map((player, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong><span>${escapePoint(player.name)} <small>(${escapePoint(player.team)})</small></span><small class="ranking-stats"><span><b>Pontos</b>${player.points}</span></small></div>`).join("") : "<p>Nenhum ponto individual foi registrado.</p>"}</div>`;
-  renderPointFinishedHistory();
-  document.querySelector("#point-finished-history").hidden = true;
-  document.querySelector("#point-finished-history-toggle").setAttribute("aria-expanded", "false");
-  document.querySelector("#point-finished-history-toggle").textContent = "Ver histórico de movimentos";
 }
 
 function printFinishedPointResultLegacy() {
@@ -580,6 +613,16 @@ async function printFinishedPointResult() {
   line("VÔLEI HUB", 12, true); line("Resultado de partida", 20, true); line(result.reason); y += 3;
   line("Classificação final", 15, true); tableRow(headers, true);
   result.standings.forEach((team, index) => tableRow(showPointsBalance ? [`${index + 1}º`, team.name, team.games, team.wins, team.losses, team.points, `${team.difference >= 0 ? "+" : ""}${team.difference}`] : [`${index + 1}º`, team.name, team.games, team.wins, team.losses]));
+  if (result.exclusionAlert) {
+    y += 2;
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(8.5);
+    pdf.setTextColor(180, 83, 9);
+    const alertLines = pdf.splitTextToSize(result.exclusionAlert, 175);
+    if (y + alertLines.length * 4.5 > 280) { pdf.addPage(); y = 18; }
+    pdf.text(alertLines, 18, y);
+    y += alertLines.length * 4.5 + 2;
+  }
   const players = result.playerStandings || [];
   if (players.length) { y += 8; line("Top 10 jogadores", 15, true); players.slice(0, 10).forEach((player, index) => line(`${index + 1}º ${player.name} · ${player.team} · ${player.points} pontos`)); }
   y += 8; line("Jogos por rodada", 15, true);
@@ -590,8 +633,31 @@ async function printFinishedPointResult() {
   });
   const filename = pointPdfFileName(result.startedAt || result.finishedAt);
   const file = new File([pdf.output("blob")], filename, { type: "application/pdf" });
+  const shareTitle = "Resultado - Vôlei Hub";
+
+  let rankingText = "";
+  if (result.standings && result.standings.length) {
+    rankingText = "\n\n*Classificação Final:*\n" + result.standings.slice(0, 5).map((team, idx) => {
+      const medals = ["🥇", "🥈", "🥉"];
+      const prefix = medals[idx] || `${idx + 1}º`;
+      return `${prefix} ${team.name} (${team.wins} vitórias)`;
+    }).join("\n");
+  }
+
+  const whatsappMsg = `🏆 *VÔLEI HUB - RESULTADO (PONTO A PONTO)* 🏆\n${result.reason || "Partida finalizada"}${rankingText}\n\n📎 O relatório completo em PDF foi baixado no dispositivo para envio!`;
+
+  if (window.openPdfShareModal) {
+    window.openPdfShareModal({
+      file,
+      title: shareTitle,
+      text: "Resultado da partida.",
+      whatsappText: whatsappMsg
+    });
+    return;
+  }
+
   if (navigator.canShare?.({ files: [file] })) {
-    try { await navigator.share({ title: "Resultado - Vôlei Hub", text: "Resultado da partida.", files: [file] }); return; }
+    try { await navigator.share({ title: shareTitle, text: "Resultado da partida.", files: [file] }); return; }
     catch (error) { if (error.name === "AbortError") return; }
   }
   pdf.save(filename);

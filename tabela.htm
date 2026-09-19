@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="style.css?v=11" />
     <link rel="icon" type="image/png" href="assets/favicon.png" />
   </head>
   <body class="app-loading" data-theme="dark">
@@ -30,6 +30,7 @@
         <div id="settings-panel" class="settings-panel" hidden>
           <label class="switch-label" for="unlimited-rounds">
             <input id="unlimited-rounds" type="checkbox" />
+            <span class="switch-ui" aria-hidden="true"></span>
             <span>
               <strong>Sem limite de rodadas</strong>
               <small>Permite qualquer quantidade de rodadas. Fora dos blocos de turno e retorno, confrontos poderão se repetir.</small>
@@ -87,12 +88,13 @@
         <div id="rounds" class="rounds"></div>
       </section>
     </main>
-    <footer class="site-footer">© 2026 RST Code. Todos os direitos reservados.</footer>
+    <footer class="site-footer">© 2026 RST Cipher • Versão 2.0.5</footer>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin="anonymous"></script>
     <script src="supabase-config.js"></script>
     <script src="theme.js"></script>
     <script src="table-auth.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha512-qZvrmS2ekKPF2mSznTQsxqP5qwxAxaYXHvd5bWtfESyUNFuGkj7vKLTCksktE2mVCvZXgYhGlg26xsmKmgzTEQ==" crossorigin="anonymous"></script>
-    <script src="java.js"></script>
+    <script src="pdf-share.js?v=1"></script>
+    <script src="java.js?v=2"></script>
   </body>
 </html>

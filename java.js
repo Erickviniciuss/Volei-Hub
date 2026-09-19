@@ -201,15 +201,23 @@ async function printGeneratedTable() {
     y += 4;
   });
   const file = new File([pdf.output("blob")], tablePdfFileName(), { type: "application/pdf" });
-  const shareData = { title: "Tabela de jogos - Vôlei Hub", text: "Tabela de jogos do Vôlei Hub.", files: [file] };
-  if (navigator.canShare?.({ files: [file] })) {
-    try { await navigator.share(shareData); } catch (error) { if (error.name !== "AbortError") window.alert("Não foi possível abrir o compartilhamento."); }
+  const shareTitle = "Tabela de jogos - Vôlei Hub";
+  const whatsappMsg = `🏐 *VÔLEI HUB - TABELA DE JOGOS* 🏐\n📅 ${new Date().toLocaleDateString("pt-BR")}\n${generatedSchedule.length} rodadas geradas.\n\n📎 O PDF completo foi baixado no dispositivo para envio!`;
+
+  if (window.openPdfShareModal) {
+    window.openPdfShareModal({
+      file,
+      title: shareTitle,
+      text: "Tabela de jogos do Vôlei Hub.",
+      whatsappText: whatsappMsg
+    });
     return;
   }
+
   const link = document.createElement("a");
   link.href = URL.createObjectURL(file); link.download = file.name; link.click();
   URL.revokeObjectURL(link.href);
-  window.open("https://wa.me/?text=" + encodeURIComponent("Tabela de jogos do Vôlei Hub. O PDF foi baixado para você anexar nesta conversa."), "_blank", "noopener");
+  window.open("https://wa.me/?text=" + encodeURIComponent(whatsappMsg), "_blank", "noopener");
 }
 
 countSelect.addEventListener("change", makeNameInputs);

@@ -318,11 +318,6 @@ h2 { font-size: clamp(2rem, 4vw, 3rem); }
 .settings-button:hover { color: var(--accent-text); background: var(--purple); transform: rotate(20deg); }
 .settings-panel { margin: 0 0 20px; padding: 15px; border: 1px solid var(--line); border-radius: 13px; background: var(--soft-card); }
 .settings-panel[hidden] { display: none; }
-.switch-label { display: flex; align-items: flex-start; gap: 11px; cursor: pointer; }
-.switch-label input { box-sizing: border-box; flex: 0 0 18px; width: 18px; height: 18px; min-width: 18px; min-height: 18px; margin: 2px 0 0; accent-color: var(--purple); }
-.switch-label strong, .switch-label small { display: block; }
-.switch-label strong { font-size: .91rem; }
-.switch-label small { margin-top: 3px; color: var(--muted); font-size: .82rem; line-height: 1.35; }
 .field-row { display: flex; align-items: end; gap: 18px; }
 .field-group { display: grid; gap: 8px; flex: 1; max-width: 320px; }
 .compact-field { max-width: 185px; }
@@ -374,8 +369,289 @@ button:hover { background: var(--purple-dark); transform: translateY(-1px); }
 .import-quick-game { width: 100%; min-width: 0; margin: 0; padding: 7px 4px; font-size: .67rem; line-height: 1.15; white-space: normal; }
 .coming-soon-page { min-height: calc(100vh - 70px); }
 .config-account-form { display: grid; max-width: 520px; gap: 9px; margin-top: 22px; }
-.config-account-form button { width: min(100%, 260px); margin-top: 9px; }
 .password-recovery-card > p:not(.eyebrow) { max-width: 520px; margin: 10px 0 0; color: var(--muted); line-height: 1.45; }
+
+/* Menu Suspenso Flutuante de Salvar (Canto Inferior Direito) */
+.floating-save-bar {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 10px 8px 18px;
+  border-radius: 9999px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28), 0 4px 14px rgba(0, 0, 0, 0.16);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transform: translateY(100px);
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease, visibility 0.28s;
+}
+
+.floating-save-bar.is-visible {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.floating-save-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f59e0b;
+  animation: pulse-dot 1.8s infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+.floating-save-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 22px;
+  border-radius: 9999px;
+  color: var(--accent-text);
+  background: var(--purple);
+  box-shadow: 0 4px 14px rgba(34, 211, 238, 0.35);
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: 0;
+  transition: background 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.floating-save-button:hover:not(:disabled) {
+  background: var(--purple-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(34, 211, 238, 0.45);
+}
+
+.floating-save-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.floating-save-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.save-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-radius: 50%;
+  border-top-color: #ffffff;
+  animation: spin-save 0.65s linear infinite;
+}
+
+@keyframes spin-save {
+  to { transform: rotate(360deg); }
+}
+
+/* Toast de status no canto inferior direito */
+.config-toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+  transform: translateY(80px);
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease, visibility 0.25s;
+}
+
+.config-toast.is-visible {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.config-toast.is-success {
+  color: #ffffff;
+  background: #15803d;
+}
+
+.config-toast.is-error {
+  color: #ffffff;
+  background: #dc2626;
+}
+
+@media (max-width: 580px) {
+  .floating-save-bar {
+    right: 14px;
+    bottom: 16px;
+    left: 14px;
+    justify-content: space-between;
+    padding: 8px 8px 8px 14px;
+  }
+  .config-toast {
+    right: 14px;
+    bottom: 16px;
+    left: 14px;
+  }
+}
+
+/* Botões Toggle Switch Modernos (Estilo Pílula) */
+.switch-label {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 16px !important;
+  cursor: pointer !important;
+  padding: 14px 18px !important;
+  border-radius: 14px !important;
+  border: 1px solid var(--line) !important;
+  background: var(--soft-card) !important;
+  margin: 10px 0 !important;
+  user-select: none !important;
+  box-sizing: border-box !important;
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+.switch-label:hover {
+  background: var(--card) !important;
+  border-color: var(--purple-dark) !important;
+}
+.switch-label > span:not(.switch-ui) {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 3px !important;
+  flex: 1 1 auto !important;
+  order: 1 !important;
+  text-align: left !important;
+  min-width: 0 !important;
+}
+.switch-label > span:not(.switch-ui) strong {
+  font-size: 0.95rem !important;
+  font-weight: 600 !important;
+  color: var(--ink) !important;
+  display: block !important;
+}
+.switch-label > span:not(.switch-ui) small {
+  font-size: 0.8rem !important;
+  color: var(--muted) !important;
+  line-height: 1.4 !important;
+  display: block !important;
+}
+
+/* Checkbox real escondido */
+.switch-label input[type="checkbox"] {
+  position: absolute !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  pointer-events: none !important;
+}
+
+/* O Switch visual (Pílula) */
+.switch-ui {
+  display: block !important;
+  position: relative !important;
+  order: 2 !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  width: 48px !important;
+  min-width: 48px !important;
+  max-width: 48px !important;
+  height: 26px !important;
+  min-height: 26px !important;
+  max-height: 26px !important;
+  border-radius: 9999px !important;
+  background-color: #cbd5e1 !important;
+  box-sizing: border-box !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  cursor: pointer !important;
+  transition: background-color 0.25s ease, box-shadow 0.25s ease !important;
+}
+body[data-theme="dark"] .switch-ui {
+  background-color: #374151 !important;
+}
+
+/* Botão circular branco */
+.switch-ui::before {
+  content: "" !important;
+  position: absolute !important;
+  top: 3px !important;
+  left: 3px !important;
+  width: 20px !important;
+  height: 20px !important;
+  border-radius: 50% !important;
+  background-color: #ffffff !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.22), 0 1px 2px rgba(0, 0, 0, 0.12) !important;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-sizing: border-box !important;
+}
+
+/* Estado Ativado (checked) - mesmo azul dos botões do sistema */
+.switch-label input[type="checkbox"]:checked ~ .switch-ui,
+.switch-label input[type="checkbox"]:checked + .switch-ui {
+  background-color: var(--purple-dark) !important;
+}
+body[data-theme="light"] .switch-label input[type="checkbox"]:checked ~ .switch-ui,
+body[data-theme="light"] .switch-label input[type="checkbox"]:checked + .switch-ui {
+  background-color: var(--purple-dark) !important;
+}
+body[data-theme="dark"] .switch-label input[type="checkbox"]:checked ~ .switch-ui,
+body[data-theme="dark"] .switch-label input[type="checkbox"]:checked + .switch-ui {
+  background-color: var(--purple-dark) !important;
+}
+.switch-label input[type="checkbox"]:checked ~ .switch-ui::before,
+.switch-label input[type="checkbox"]:checked + .switch-ui::before {
+  transform: translateX(22px) !important;
+}
+
+.switch-label input[type="checkbox"]:focus-visible ~ .switch-ui,
+.switch-label input[type="checkbox"]:focus-visible + .switch-ui {
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.45) !important;
+}
+.switch-label input[type="checkbox"]:disabled ~ .switch-ui,
+.switch-label input[type="checkbox"]:disabled + .switch-ui {
+  opacity: 0.45 !important;
+  cursor: not-allowed !important;
+}
+.switch-label:has(input[type="checkbox"]:disabled) {
+  opacity: 0.6 !important;
+  cursor: not-allowed !important;
+}
 .point-history-editor-toggle { margin-top: 18px; }
 .point-history-editor { display: grid; gap: 14px; margin-top: 14px; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--soft-card); }
 .point-history-editor[hidden] { display: none !important; }
@@ -586,3 +862,179 @@ button:hover { background: var(--purple-dark); transform: translateY(-1px); }
   button { width: 100%; }
   .summary { text-align: center; white-space: normal; }
 }
+
+.exclusion-alert-box { margin: 12px 0 16px; padding: 12px 16px; border: 1px solid rgba(245, 158, 11, .4); border-radius: 12px; color: #f59e0b; background: rgba(245, 158, 11, .1); font-size: .84rem; font-weight: 500; line-height: 1.45; text-align: left; }
+
+/* Modal de Compartilhamento de PDF / WhatsApp */
+.pdf-share-dialog {
+  width: min(calc(100% - 32px), 480px);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  color: var(--ink);
+  background: var(--card);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
+}
+
+.pdf-share-dialog::backdrop {
+  background: rgba(0, 10, 23, 0.7);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.pdf-share-content {
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+}
+
+.pdf-share-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pdf-share-header h2 {
+  font-size: 2rem;
+  margin: 0;
+}
+
+.pdf-share-file-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--soft-card);
+}
+
+.pdf-file-icon {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.pdf-file-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pdf-file-details strong {
+  font-size: 0.92rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pdf-file-details small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.pdf-share-options {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.pdf-share-opt {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 58px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--soft-card);
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  box-shadow: none;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.pdf-share-opt:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+
+.pdf-share-opt.opt-whatsapp {
+  border-color: rgba(37, 211, 102, 0.35);
+}
+
+.pdf-share-opt.opt-whatsapp:hover {
+  background: rgba(37, 211, 102, 0.08);
+  border-color: #25d366;
+}
+
+.pdf-share-opt.opt-whatsapp .pdf-opt-icon {
+  color: #25d366;
+  background: rgba(37, 211, 102, 0.15);
+}
+
+.pdf-share-opt.opt-device:hover {
+  border-color: var(--purple-dark);
+  background: rgba(34, 211, 238, 0.08);
+}
+
+.pdf-share-opt.opt-device .pdf-opt-icon {
+  color: var(--purple-dark);
+  background: rgba(34, 211, 238, 0.15);
+}
+
+.pdf-share-opt.opt-download:hover {
+  border-color: var(--muted);
+  background: var(--card);
+}
+
+.pdf-opt-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  font-size: 1.25rem;
+  background: var(--line);
+}
+
+.pdf-opt-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.pdf-opt-text strong {
+  font-size: 0.95rem;
+  color: var(--ink);
+}
+
+.pdf-opt-text small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.pdf-share-feedback {
+  margin: 4px 0 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 0.84rem;
+  line-height: 1.4;
+  text-align: center;
+  background: rgba(37, 211, 102, 0.12);
+  color: #15803d;
+  border: 1px solid rgba(37, 211, 102, 0.3);
+}
+
+body[data-theme="dark"] .pdf-share-feedback {
+  color: #4ade80;
+}
+

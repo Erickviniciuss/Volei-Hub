@@ -5,11 +5,51 @@
     <title>Configurações | Vôlei Hub</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=6" /><link rel="icon" type="image/png" href="assets/favicon.png" />
+    <link rel="stylesheet" href="style.css?v=11" /><link rel="icon" type="image/png" href="assets/favicon.png" />
   </head>
   <body class="app-loading" data-theme="dark">
-    <main class="page-shell"><div class="table-top-actions"><img class="table-logo" data-theme-logo src="assets/logo_escuro.png" alt="Vôlei Hub" /><button class="theme-button" type="button" data-theme-toggle aria-pressed="true">☀</button></div><section class="hero"><p class="eyebrow">SISTEMA</p><h1>Configurações</h1><p class="hero-text">Edite as informações da sua conta.</p></section><section class="setup-card"><p class="eyebrow">MINHA CONTA</p><h2>Editar cadastro</h2><form id="account-form" class="config-account-form"><label for="account-edit-name">Nome da conta</label><input id="account-edit-name" type="text" minlength="2" maxlength="50" required /><label for="account-edit-email">E-mail</label><input id="account-edit-email" type="email" required /><p id="account-message" class="auth-message" role="status"></p><button type="submit">Salvar alterações</button></form></section><a class="home-button" href="index.html"><span aria-hidden="true"><img src="assets/casa.png" alt="" /></span> Voltar para o menu principal</a></main>
-    <footer class="site-footer">© 2026 RST Code. Todos os direitos reservados.</footer>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin="anonymous"></script><script src="supabase-config.js"></script><script src="theme.js"></script><script src="table-auth.js"></script><script src="config.js?v=5"></script>
+    <main class="page-shell">
+      <div class="table-top-actions">
+        <img class="table-logo" data-theme-logo src="assets/logo_escuro.png" alt="Vôlei Hub" />
+        <button class="theme-button" type="button" data-theme-toggle aria-pressed="true">☀</button>
+      </div>
+      <section class="hero">
+        <p class="eyebrow">SISTEMA</p>
+        <h1>Configurações</h1>
+        <p class="hero-text">Edite as informações da sua conta e do sistema.</p>
+      </section>
+      <section class="setup-card">
+        <p class="eyebrow">MINHA CONTA</p>
+        <h2>Editar cadastro</h2>
+        <div id="account-form" class="config-account-form">
+          <label for="account-edit-name">Nome da conta</label>
+          <input id="account-edit-name" type="text" minlength="2" maxlength="50" required />
+          <label for="account-edit-email">E-mail</label>
+          <input id="account-edit-email" type="email" required />
+          <small class="field-hint" style="color: var(--muted); font-size: 0.8rem; margin-top: -2px;">Este e-mail é utilizado para login e recuperação de senha.</small>
+        </div>
+      </section>
+      <a class="home-button" href="index.html"><span aria-hidden="true"><img src="assets/casa.png" alt="" /></span> Voltar para o menu principal</a>
+    </main>
+
+    <div id="floating-save-bar" class="floating-save-bar" aria-live="polite">
+      <div class="floating-save-status">
+        <span class="status-dot"></span>
+        <span>Alterações não salvas</span>
+      </div>
+      <button id="floating-save-button" class="floating-save-button" type="button">
+        <span class="save-icon" aria-hidden="true">✓</span>
+        <span>Salvar</span>
+      </button>
+    </div>
+
+    <div id="config-toast" class="config-toast" role="alert" aria-live="assertive"></div>
+
+    <footer class="site-footer">© 2026 RST Cipher • Versão 2.0.5</footer>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin="anonymous"></script>
+    <script src="supabase-config.js"></script>
+    <script src="theme.js"></script>
+    <script src="table-auth.js"></script>
+    <script src="config.js?v=10"></script>
   </body>
 </html>
