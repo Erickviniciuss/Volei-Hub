@@ -868,12 +868,18 @@ body[data-theme="dark"] .switch-label input[type="checkbox"]:checked + .switch-u
 /* Modal de Compartilhamento de PDF / WhatsApp */
 .pdf-share-dialog {
   width: min(calc(100% - 32px), 480px);
+  max-height: 90vh;
+  margin: auto;
+  position: fixed;
+  inset: 0;
   padding: 0;
   border: 1px solid var(--line);
   border-radius: 20px;
   color: var(--ink);
   background: var(--card);
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
+  overflow-y: auto;
+  z-index: 9999;
 }
 
 .pdf-share-dialog::backdrop {

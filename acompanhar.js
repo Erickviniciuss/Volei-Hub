@@ -96,14 +96,30 @@ async function loadViewerGame() {
 
 function printViewerPdf() {
   if (!viewerGame) return;
-  const scores = new Map(viewerGame.scores || []);
-  const ranking = standingsFor(viewerGame).map((team, index) => `<tr><td>${index + 1}º</td><td>${escapeViewer(team.name)}</td><td>${team.games}</td><td>${team.wins}</td><td>${team.losses}</td><td>${team.points}</td><td>${team.difference >= 0 ? "+" : ""}${team.difference}</td></tr>`).join("");
-  const rounds = (viewerGame.schedule || []).map((round, roundIndex) => `<section><h2>Rodada ${roundIndex + 1}</h2>${round.matches.map(([home, away], matchIndex) => { const score = scores.get(scoreKeyViewer(roundIndex, matchIndex)); const value = score ? (Array.isArray(score) ? `${score[0]} × ${score[1]}` : `${score.home} × ${score.away}`) : "×"; return `<p>${escapeViewer(home)} <strong>${value}</strong> ${escapeViewer(away)}</p>`; }).join("")}${round.bye ? `<p>Folga: ${escapeViewer(round.bye)}</p>` : ""}</section>`).join("");
-  const report = window.open("", "_blank");
-  if (!report) return;
-  report.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Volei Hub - Resultado</title><style>body{font-family:Arial,sans-serif;color:#1e293b;margin:32px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #cbd5e1;padding:8px;text-align:left}th{background:#1f2937;color:#fff}section{break-inside:avoid;border:1px solid #cbd5e1;border-radius:8px;padding:14px;margin-top:18px}h2{margin-top:0}strong{color:#0e7490}</style></head><body><h1>VÔLEI HUB</h1><p>${escapeViewer(viewerGame.reason || "Jogo encerrado")}</p><h2>Classificação final</h2><table><thead><tr><th>#</th><th>Equipe</th><th>Jogos</th><th>Vit.</th><th>Der.</th><th>Pontos</th><th>Saldo</th></tr></thead><tbody>${ranking}</tbody></table>${rounds}</body></html>`);
-  report.document.close();
-  window.setTimeout(() => { report.focus(); report.print(); }, 300);
+  const shareTitle = "Acompanhar Jogo - Vôlei Hub";
+  let rankingText = "";
+  const standings = standingsFor(viewerGame);
+  if (standings.length) {
+    rankingText = "\n\n*Classificação Atual:*\n" + standings.slice(0, 5).map((team, idx) => {
+      const medals = ["🥇", "🥈", "🥉"];
+      const prefix = medals[idx] || `${idx + 1}º`;
+      return `${prefix} ${team.name} (${team.wins} vitórias)`;
+    }).join("\n");
+  }
+  const whatsappMsg = `🏐 *VÔLEI HUB - ACOMPANHAMENTO DE JOGO* 🏐\n${viewerGame.reason || "Jogo em andamento"}${rankingText}\n\nCódigo de acompanhamento: ${viewerGame.shareCode || ""}\n🏐 Acesse pelo Vôlei Hub`;
+
+  if (window.openPdfShareModal) {
+    window.openPdfShareModal({
+      file: null,
+      title: shareTitle,
+      text: "Acompanhamento do jogo no Vôlei Hub.",
+      whatsappText: whatsappMsg
+    });
+    return;
+  }
+
+  const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(whatsappMsg)}`;
+  window.open(waUrl, "_blank");
 }
 
 function openViewerFromCode() {

@@ -124,126 +124,130 @@ async function printResult(result) {
   }).join("");
   const rounds = result.schedule.map((round, roundIndex) => `<section class="round"><h2>Rodada ${roundIndex + 1}</h2>${round.matches.map(([home, away], gameIndex) => { const movements = pointMovements(result, roundIndex, gameIndex); return `<div class="match"><span>${escapeResult(home)}</span><strong>${scoreFor(result, roundIndex, gameIndex)}</strong><span>${escapeResult(away)}</span></div>${movements.length ? `<div class="print-movements"><b>Histórico de movimentos</b>${movements.map((movement, index) => `<p>${index + 1}º lance · ${escapeResult(movementText(movement))}</p>`).join("")}</div>` : ""}`; }).join("")}${round.bye ? `<p>Folga: <b>${escapeResult(round.bye)}</b></p>` : ""}</section>`).join("");
   const topPlayersHtml = topPlayers.length ? `<h1>Top 10 jogadores</h1><ol>${topPlayers.map((player) => `<li>${escapeResult(player.name)} · ${escapeResult(player.team)} · ${player.points} pontos</li>`).join("")}</ol>` : "";
+  let rankingText = "";
+  if (result.standings && result.standings.length) {
+    rankingText = "\n\n*Classificação Final:*\n" + result.standings.slice(0, 5).map((team, idx) => {
+      const medals = ["🥇", "🥈", "🥉"];
+      const prefix = medals[idx] || `${idx + 1}º`;
+      return `${prefix} ${team.name} (${team.wins} vitórias)`;
+    }).join("\n");
+  }
+  const shareTitle = "Resultado - Vôlei Hub";
+  const whatsappMsg = `🏆 *VÔLEI HUB - RESULTADO DE PARTIDA* 🏆\n${result.reason || "Histórico de jogo"}${rankingText}\n\n🏐 Gerado pelo Vôlei Hub`;
+
+  let file = null;
   const Pdf = window.jspdf?.jsPDF;
   if (Pdf) {
-    const pdf = new Pdf({ unit: "mm", format: "a4" }); let y = 18;
-    const line = (text, size = 10, bold = false) => {
-      pdf.setFont("helvetica", bold ? "bold" : "normal"); pdf.setFontSize(size);
-      const lines = pdf.splitTextToSize(text, 175);
-      if (y + lines.length * 6 > 280) { pdf.addPage(); y = 18; }
-      pdf.text(lines, 18, y); y += lines.length * 6;
-    };
-    const compactMovements = (movements) => {
-      const writeCompact = (text) => {
-        pdf.setFont("helvetica", "normal"); pdf.setFontSize(6);
+    try {
+      const pdf = new Pdf({ unit: "mm", format: "a4" }); let y = 18;
+      const line = (text, size = 10, bold = false) => {
+        pdf.setFont("helvetica", bold ? "bold" : "normal"); pdf.setFontSize(size);
         const lines = pdf.splitTextToSize(text, 175);
-        if (y + lines.length * 2.6 > 280) { pdf.addPage(); y = 18; }
-        pdf.text(lines, 18, y); y += lines.length * 2.6;
+        if (y + lines.length * 6 > 280) { pdf.addPage(); y = 18; }
+        pdf.text(lines, 18, y); y += lines.length * 6;
       };
-      pdf.setFont("helvetica", "normal"); pdf.setFontSize(6);
-      let row = [];
-      movements.forEach((movement, index) => {
-        const entry = `${index + 1}º ${movement.team}: ${movement.player}${movement.time ? ` ${movement.time}` : ""} ${movement.homeScore} × ${movement.awayScore}`;
-        const candidate = [...row, entry].join(" | ");
-        if (row.length && (row.length === 6 || pdf.getTextWidth(candidate) > 175)) { writeCompact(row.join(" | ")); row = [entry]; }
-        else row.push(entry);
+      const compactMovements = (movements) => {
+        const writeCompact = (text) => {
+          pdf.setFont("helvetica", "normal"); pdf.setFontSize(6);
+          const lines = pdf.splitTextToSize(text, 175);
+          if (y + lines.length * 2.6 > 280) { pdf.addPage(); y = 18; }
+          pdf.text(lines, 18, y); y += lines.length * 2.6;
+        };
+        pdf.setFont("helvetica", "normal"); pdf.setFontSize(6);
+        let row = [];
+        movements.forEach((movement, index) => {
+          const entry = `${index + 1}º ${movement.team}: ${movement.player}${movement.time ? ` ${movement.time}` : ""} ${movement.homeScore} × ${movement.awayScore}`;
+          const candidate = [...row, entry].join(" | ");
+          if (row.length && (row.length === 6 || pdf.getTextWidth(candidate) > 175)) { writeCompact(row.join(" | ")); row = [entry]; }
+          else row.push(entry);
+        });
+        if (row.length) writeCompact(row.join(" | "));
+      };
+      line("VÔLEI HUB", 12, true); line("Resultado de partida", 20, true); line(result.reason); y += 3;
+      line("Classificação final", 15, true);
+      const columns = showPointsBalance ? [10, 62, 18, 18, 18, 24, 24] : [10, 78, 22, 22, 22];
+      const headers = showPointsBalance ? ["#", "Equipe", "Jogos", "Vit.", "Der.", "Pontos", "Saldo"] : ["#", "Equipe", "Jogos", "Vit.", "Der."];
+      const drawRankingRow = (cells, header = false) => {
+        const height = 8;
+        if (y + height > 280) { pdf.addPage(); y = 18; }
+        let x = 18;
+        cells.forEach((cell, index) => {
+          pdf.setDrawColor(190, 200, 210);
+          pdf.setFillColor(header ? 30 : 255, header ? 41 : 255, header ? 59 : 255);
+          pdf.rect(x, y, columns[index], height, "F");
+          pdf.rect(x, y, columns[index], height, "S");
+          pdf.setTextColor(header ? 255 : 30, header ? 255 : 41, header ? 255 : 59);
+          pdf.setFont("helvetica", header ? "bold" : "normal"); pdf.setFontSize(header ? 8 : 8.5);
+          const text = pdf.splitTextToSize(String(cell), columns[index] - 3)[0] || "";
+          const centered = index !== 1;
+          if (centered) pdf.text(text, x + columns[index] / 2, y + 5.2, { align: "center" });
+          else pdf.text(text, x + 1.5, y + 5.2);
+          x += columns[index];
+        });
+        y += height;
+      };
+      drawRankingRow(headers, true);
+      result.standings.forEach((team, index) => {
+        const visual = resultVisualStats(result, team);
+        drawRankingRow(showPointsBalance ? [`${index + 1}º`, team.name, visual.games, team.wins, visual.losses, team.points, `${team.difference >= 0 ? "+" : ""}${team.difference}`] : [`${index + 1}º`, team.name, visual.games, team.wins, visual.losses]);
       });
-      if (row.length) writeCompact(row.join(" | "));
-    };
-    line("VÔLEI HUB", 12, true); line("Resultado de partida", 20, true); line(result.reason); y += 3;
-    line("Classificação final", 15, true);
-    const columns = showPointsBalance ? [10, 62, 18, 18, 18, 24, 24] : [10, 78, 22, 22, 22];
-    const headers = showPointsBalance ? ["#", "Equipe", "Jogos", "Vit.", "Der.", "Pontos", "Saldo"] : ["#", "Equipe", "Jogos", "Vit.", "Der."];
-    const drawRankingRow = (cells, header = false) => {
-      const height = 8;
-      if (y + height > 280) { pdf.addPage(); y = 18; }
-      let x = 18;
-      cells.forEach((cell, index) => {
-        pdf.setDrawColor(190, 200, 210);
-        pdf.setFillColor(header ? 30 : 255, header ? 41 : 255, header ? 59 : 255);
-        pdf.rect(x, y, columns[index], height, "F");
-        pdf.rect(x, y, columns[index], height, "S");
-        pdf.setTextColor(header ? 255 : 30, header ? 255 : 41, header ? 255 : 59);
-        pdf.setFont("helvetica", header ? "bold" : "normal"); pdf.setFontSize(header ? 8 : 8.5);
-        const text = pdf.splitTextToSize(String(cell), columns[index] - 3)[0] || "";
-        const centered = index !== 1;
-        if (centered) pdf.text(text, x + columns[index] / 2, y + 5.2, { align: "center" });
-        else pdf.text(text, x + 1.5, y + 5.2);
-        x += columns[index];
+      if (result.exclusionAlert) {
+        y += 2;
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(8.5);
+        pdf.setTextColor(180, 83, 9);
+        const alertLines = pdf.splitTextToSize(result.exclusionAlert, 175);
+        if (y + alertLines.length * 4.5 > 280) { pdf.addPage(); y = 18; }
+        pdf.text(alertLines, 18, y);
+        y += alertLines.length * 4.5 + 2;
+      }
+      pdf.setTextColor(30, 41, 59);
+      if (topPlayers.length) {
+        y += 12; line("Top 10 jogadores", 15, true);
+        topPlayers.forEach((player, index) => line(`${index + 1}º ${player.name} · ${player.team} · ${player.points} pontos`));
+      }
+      y += 12; line("Participantes por equipe", 15, true);
+      teamNames.forEach((team, teamIndex) => {
+        const names = Array.from({ length: totalPlayers }, (_, playerIndex) => result.players?.[teamIndex]?.[playerIndex] || "Vazio");
+        line(`${team}: ${names.join(", ")}`);
       });
-      y += height;
-    };
-    drawRankingRow(headers, true);
-    result.standings.forEach((team, index) => {
-      const visual = resultVisualStats(result, team);
-      drawRankingRow(showPointsBalance ? [`${index + 1}º`, team.name, visual.games, team.wins, visual.losses, team.points, `${team.difference >= 0 ? "+" : ""}${team.difference}`] : [`${index + 1}º`, team.name, visual.games, team.wins, visual.losses]);
-    });
-    if (result.exclusionAlert) {
-      y += 2;
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(8.5);
-      pdf.setTextColor(180, 83, 9);
-      const alertLines = pdf.splitTextToSize(result.exclusionAlert, 175);
-      if (y + alertLines.length * 4.5 > 280) { pdf.addPage(); y = 18; }
-      pdf.text(alertLines, 18, y);
-      y += alertLines.length * 4.5 + 2;
-    }
-    pdf.setTextColor(30, 41, 59);
-    if (topPlayers.length) {
-      y += 12; line("Top 10 jogadores", 15, true);
-      topPlayers.forEach((player, index) => line(`${index + 1}º ${player.name} · ${player.team} · ${player.points} pontos`));
-    }
-    y += 12; line("Participantes por equipe", 15, true);
-    teamNames.forEach((team, teamIndex) => {
-      const names = Array.from({ length: totalPlayers }, (_, playerIndex) => result.players?.[teamIndex]?.[playerIndex] || "Vazio");
-      line(`${team}: ${names.join(", ")}`);
-    });
-    y += 3; line("Jogos por rodada", 15, true);
-    playedRoundIndexes.forEach((roundIndex) => {
-      const round = result.schedule[roundIndex];
-      line(`Rodada ${roundIndex + 1}`, 13, true);
-      round.matches.forEach(([home, away], gameIndex) => {
-        line(`${home}    ${scoreFor(result, roundIndex, gameIndex)}    ${away}`);
-        const movements = pointMovements(result, roundIndex, gameIndex);
-        compactMovements(movements);
-        if (movements.length) y += 4;
+      y += 3; line("Jogos por rodada", 15, true);
+      playedRoundIndexes.forEach((roundIndex) => {
+        const round = result.schedule[roundIndex];
+        line(`Rodada ${roundIndex + 1}`, 13, true);
+        round.matches.forEach(([home, away], gameIndex) => {
+          line(`${home}    ${scoreFor(result, roundIndex, gameIndex)}    ${away}`);
+          const movements = pointMovements(result, roundIndex, gameIndex);
+          compactMovements(movements);
+          if (movements.length) y += 4;
+        });
+        if (round.bye) line(`Folga: ${round.bye}`, 9);
+        y += 3;
       });
-      if (round.bye) line(`Folga: ${round.bye}`, 9);
-      y += 3;
-    });
-    const file = new File([pdf.output("blob")], resultPdfFileName(result.startedAt || result.finishedAt), { type: "application/pdf" });
-    const shareTitle = "Resultado - Vôlei Hub";
-
-    let rankingText = "";
-    if (result.standings && result.standings.length) {
-      rankingText = "\n\n*Classificação Final:*\n" + result.standings.slice(0, 5).map((team, idx) => {
-        const medals = ["🥇", "🥈", "🥉"];
-        const prefix = medals[idx] || `${idx + 1}º`;
-        return `${prefix} ${team.name} (${team.wins} vitórias)`;
-      }).join("\n");
-    }
-
-    const whatsappMsg = `🏆 *VÔLEI HUB - RESULTADO DE PARTIDA* 🏆\n${result.reason || "Histórico de jogo"}${rankingText}\n\n📎 O PDF completo foi baixado no dispositivo para envio!`;
-
-    if (window.openPdfShareModal) {
-      window.openPdfShareModal({
-        file,
-        title: shareTitle,
-        text: "Resultado da partida.",
-        whatsappText: whatsappMsg
-      });
-      return;
-    }
-
-    if (navigator.canShare?.({ files: [file] })) {
-      try { await navigator.share({ title: shareTitle, text: "Resultado da partida.", files: [file] }); return; }
-      catch (error) { if (error.name === "AbortError") return; }
+      const fileName = resultPdfFileName(result.startedAt || result.finishedAt);
+      try {
+        file = new File([pdf.output("blob")], fileName, { type: "application/pdf" });
+      } catch (_) {
+        file = pdf.output("blob");
+        if (file) file.name = fileName;
+      }
+    } catch (err) {
+      console.warn("Erro ao compilar PDF:", err);
     }
   }
-  const report = window.open("", "_blank"); if (!report) return;
-  report.document.open();
-  report.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Resultado - Vôlei Hub</title><style>body{font-family:Arial,sans-serif;color:#1e293b;margin:36px}h1{margin:0;font-size:32px}h2{margin:28px 0 12px}.muted{color:#64748b}table{width:100%;border-collapse:collapse;margin:16px 0 30px}th,td{padding:10px;border-bottom:1px solid #e2e8f0;text-align:left}.teams{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0 30px}.team,.round{break-inside:avoid;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin:16px 0}.team{margin:0}.team h3{margin:0 0 8px}.team p{margin:0;line-height:1.5}.round h2{margin:0 0 12px}.match{display:grid;grid-template-columns:1fr auto 1fr;gap:20px;padding:9px 0;border-bottom:1px solid #e2e8f0}.match span:last-child{text-align:right}.match strong{color:#0e7490}@media print{body{margin:18px}}</style></head><body><p class="muted">VÔLEI HUB · RESULTADO DE PARTIDA</p><h1>Classificação final</h1><p class="muted">${escapeResult(result.reason)} · ${new Date(result.finishedAt).toLocaleString("pt-BR")}</p><table><thead><tr><th>#</th><th>Time</th><th>Jogos</th><th>Vitórias</th><th>Derrotas</th><th>Pontos</th><th>Saldo</th></tr></thead><tbody>${rows}</tbody></table><h1>Participantes por equipe</h1><div class="teams">${participants}</div><h1>Jogos por rodada</h1>${rounds}</body></html>`);
-  report.document.close(); window.setTimeout(() => { report.focus(); report.print(); }, 300);
+
+  if (window.openPdfShareModal) {
+    window.openPdfShareModal({
+      file,
+      title: shareTitle,
+      text: "Resultado da partida.",
+      whatsappText: whatsappMsg
+    });
+    return;
+  }
+
+  const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(whatsappMsg)}`;
+  window.open(waUrl, "_blank");
 }
 
 function getGameStore() {

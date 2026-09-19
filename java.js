@@ -182,27 +182,39 @@ function renderSchedule() {
 
 async function printGeneratedTable() {
   if (!generatedSchedule.length) { window.alert("Gere a tabela antes de enviar o PDF."); return; }
-  const Pdf = window.jspdf?.jsPDF;
-  if (!Pdf) { window.alert("Não foi possível preparar o PDF. Verifique sua conexão e tente novamente."); return; }
-  const pdf = new Pdf({ unit: "mm", format: "a4" });
-  let y = 18;
-  const addLine = (text, size = 10, bold = false) => {
-    pdf.setFont("helvetica", bold ? "bold" : "normal"); pdf.setFontSize(size);
-    const lines = pdf.splitTextToSize(text, 175);
-    if (y + lines.length * 6 > 280) { pdf.addPage(); y = 18; }
-    pdf.text(lines, 18, y); y += lines.length * 6;
-  };
-  addLine("VÔLEI HUB", 12, true);
-  addLine("Tabela de jogos", 22, true); y += 3;
-  generatedSchedule.forEach((round, index) => {
-    addLine(`Rodada ${index + 1}`, 14, true);
-    round.matches.forEach(([home, away]) => addLine(`${home}    ×    ${away}`));
-    if (round.bye) addLine(`Folga: ${round.bye}`, 9);
-    y += 4;
-  });
-  const file = new File([pdf.output("blob")], tablePdfFileName(), { type: "application/pdf" });
   const shareTitle = "Tabela de jogos - Vôlei Hub";
   const whatsappMsg = `🏐 *VÔLEI HUB - TABELA DE JOGOS* 🏐\n📅 ${new Date().toLocaleDateString("pt-BR")}\n${generatedSchedule.length} rodadas geradas.\n\n📎 O PDF completo foi baixado no dispositivo para envio!`;
+  let file = null;
+  const Pdf = window.jspdf?.jsPDF;
+  if (Pdf) {
+    try {
+      const pdf = new Pdf({ unit: "mm", format: "a4" });
+      let y = 18;
+      const addLine = (text, size = 10, bold = false) => {
+        pdf.setFont("helvetica", bold ? "bold" : "normal"); pdf.setFontSize(size);
+        const lines = pdf.splitTextToSize(text, 175);
+        if (y + lines.length * 6 > 280) { pdf.addPage(); y = 18; }
+        pdf.text(lines, 18, y); y += lines.length * 6;
+      };
+      addLine("VÔLEI HUB", 12, true);
+      addLine("Tabela de jogos", 22, true); y += 3;
+      generatedSchedule.forEach((round, index) => {
+        addLine(`Rodada ${index + 1}`, 14, true);
+        round.matches.forEach(([home, away]) => addLine(`${home}    ×    ${away}`));
+        if (round.bye) addLine(`Folga: ${round.bye}`, 9);
+        y += 4;
+      });
+      const fileName = tablePdfFileName();
+      try {
+        file = new File([pdf.output("blob")], fileName, { type: "application/pdf" });
+      } catch (_) {
+        file = pdf.output("blob");
+        if (file) file.name = fileName;
+      }
+    } catch (e) {
+      console.warn("Erro ao compilar PDF:", e);
+    }
+  }
 
   if (window.openPdfShareModal) {
     window.openPdfShareModal({
@@ -214,10 +226,8 @@ async function printGeneratedTable() {
     return;
   }
 
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(file); link.download = file.name; link.click();
-  URL.revokeObjectURL(link.href);
-  window.open("https://wa.me/?text=" + encodeURIComponent(whatsappMsg), "_blank", "noopener");
+  const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(whatsappMsg)}`;
+  window.open(waUrl, "_blank");
 }
 
 countSelect.addEventListener("change", makeNameInputs);

@@ -460,49 +460,53 @@ function saveRetroScores() {
 
 async function printQuickGamePdf() {
   if (!quickSchedule.length) return;
+  const shareTitle = "Tabelas do Jogo por Resultado - Vôlei Hub";
+  const whatsappMsg = `🏐 *VÔLEI HUB - TABELAS DE JOGOS* 🏐\nModalidade: Jogo por Resultado\n📅 ${new Date().toLocaleDateString("pt-BR")}\n\n📎 O PDF completo foi baixado no dispositivo para envio!`;
+  let file = null;
   const Pdf = window.jspdf?.jsPDF;
   if (Pdf) {
-    const pdf = new Pdf({ unit: "mm", format: "a4" }); let y = 18;
-    const line = (text, size = 10, bold = false) => {
-      pdf.setFont("helvetica", bold ? "bold" : "normal"); pdf.setFontSize(size);
-      const lines = pdf.splitTextToSize(text, 175);
-      if (y + lines.length * 6 > 280) { pdf.addPage(); y = 18; }
-      pdf.text(lines, 18, y); y += lines.length * 6;
-    };
-    line("VÔLEI HUB", 12, true); line("Tabelas do Jogo por Resultado", 20, true);
-    quickSchedule.forEach((round, roundIndex) => {
-      line(`Rodada ${roundIndex + 1}`, 13, true);
-      round.matches.forEach(([home, away], gameIndex) => {
-        const result = scores.get(scoreKey(roundIndex, gameIndex)); const score = result && result[0] !== "" && result[1] !== "" ? `${result[0]} × ${result[1]}` : "×";
-        line(`${home}    ${score}    ${away}`);
+    try {
+      const pdf = new Pdf({ unit: "mm", format: "a4" }); let y = 18;
+      const line = (text, size = 10, bold = false) => {
+        pdf.setFont("helvetica", bold ? "bold" : "normal"); pdf.setFontSize(size);
+        const lines = pdf.splitTextToSize(text, 175);
+        if (y + lines.length * 6 > 280) { pdf.addPage(); y = 18; }
+        pdf.text(lines, 18, y); y += lines.length * 6;
+      };
+      line("VÔLEI HUB", 12, true); line("Tabelas do Jogo por Resultado", 20, true);
+      quickSchedule.forEach((round, roundIndex) => {
+        line(`Rodada ${roundIndex + 1}`, 13, true);
+        round.matches.forEach(([home, away], gameIndex) => {
+          const result = scores.get(scoreKey(roundIndex, gameIndex)); const score = result && result[0] !== "" && result[1] !== "" ? `${result[0]} × ${result[1]}` : "×";
+          line(`${home}    ${score}    ${away}`);
+        });
+        if (round.bye) line(`Folga: ${round.bye}`, 9);
+        y += 3;
       });
-      if (round.bye) line(`Folga: ${round.bye}`, 9);
-      y += 3;
-    });
-    const file = new File([pdf.output("blob")], gamePdfFileName(gameStartedAt || new Date()), { type: "application/pdf" });
-    const shareTitle = "Tabelas do Jogo por Resultado - Vôlei Hub";
-    const whatsappMsg = `🏐 *VÔLEI HUB - TABELAS DE JOGOS* 🏐\nModalidade: Jogo por Resultado\n📅 ${new Date().toLocaleDateString("pt-BR")}\n\n📎 O PDF completo foi baixado no dispositivo para envio!`;
-    if (window.openPdfShareModal) {
-      window.openPdfShareModal({
-        file,
-        title: shareTitle,
-        text: "Tabelas de jogos do Vôlei Hub.",
-        whatsappText: whatsappMsg
-      });
-      return;
-    }
-    if (navigator.canShare?.({ files: [file] })) {
-      try { await navigator.share({ title: shareTitle, text: "Tabelas de jogos do Vôlei Hub.", files: [file] }); return; }
-      catch (error) { if (error.name === "AbortError") return; }
+      const fileName = gamePdfFileName(gameStartedAt || new Date());
+      try {
+        file = new File([pdf.output("blob")], fileName, { type: "application/pdf" });
+      } catch (_) {
+        file = pdf.output("blob");
+        if (file) file.name = fileName;
+      }
+    } catch (e) {
+      console.warn("Erro ao compilar PDF:", e);
     }
   }
-  const report = window.open("", "_blank");
-  if (!report) { window.alert("Permita a abertura de janelas para imprimir o PDF."); return; }
-  report.document.open();
-  const rounds = quickSchedule.map((round, roundIndex) => `<section class="round"><h2>Rodada ${roundIndex + 1}</h2>${round.matches.map(([home, away], gameIndex) => { const result = scores.get(scoreKey(roundIndex, gameIndex)); const score = result && result[0] !== "" && result[1] !== "" ? `${result[0]} × ${result[1]}` : "×"; return `<div class="match"><span>${escapeQuick(home)}</span><strong>${score}</strong><span>${escapeQuick(away)}</span></div>`; }).join("")}${round.bye ? `<p>Folga: <b>${escapeQuick(round.bye)}</b></p>` : ""}</section>`).join("");
-  report.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Tabelas do Jogo por Resultado</title><style>body{font-family:Arial,sans-serif;color:#1e293b;margin:36px}h1{font-size:30px}.round{break-inside:avoid;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin:16px 0}.round h2{margin:0 0 12px}.match{display:grid;grid-template-columns:1fr auto 1fr;gap:18px;padding:9px 0;border-bottom:1px solid #e2e8f0}.match span:last-child{text-align:right}.match strong{color:#0e7490}@media print{body{margin:18px}}</style></head><body><p>VÔLEI HUB · JOGO POR RESULTADO</p><h1>Tabelas de jogos</h1>${rounds}</body></html>`);
-  report.document.close();
-  window.setTimeout(() => { report.focus(); report.print(); }, 300);
+
+  if (window.openPdfShareModal) {
+    window.openPdfShareModal({
+      file,
+      title: shareTitle,
+      text: "Tabelas de jogos do Vôlei Hub.",
+      whatsappText: whatsappMsg
+    });
+    return;
+  }
+
+  const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(whatsappMsg)}`;
+  window.open(waUrl, "_blank");
 }
 
 async function finishQuickGame(message) {
@@ -550,70 +554,10 @@ async function finishQuickGame(message) {
   return;
 }
 
-function printFinishedQuickResultLegacy() {
-  const result = finishedQuickResult;
-  if (!result) return;
-  const scoreMap = new Map(result.scores || []);
-  const rows = result.standings.map((team, index) => `<tr><td>${index + 1}º</td><td>${escapeQuick(team.name)}</td><td>${team.games}</td><td>${team.wins}</td><td>${team.losses}</td><td>${team.points}</td><td>${team.difference >= 0 ? "+" : ""}${team.difference}</td></tr>`).join("");
-  const rounds = result.schedule.map((round, index) => `<section><h2>Rodada ${index + 1}</h2>${round.matches.map(([home, away], gameIndex) => { const score = scoreMap.get(scoreKey(index, gameIndex)); return `<p>${escapeQuick(home)} <b>${score?.[0] ?? "—"} × ${score?.[1] ?? "—"}</b> ${escapeQuick(away)}</p>`; }).join("")}${round.bye ? `<p>Folga: ${escapeQuick(round.bye)}</p>` : ""}</section>`).join("");
-  const report = window.open("", "_blank"); if (!report) return;
-  report.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Volei Hub - Resultado</title><style>body{font-family:Arial;color:#1e293b;margin:32px}table{width:100%;border-collapse:collapse}th,td{padding:8px;border:1px solid #cbd5e1;text-align:left}th{background:#1f2937;color:#fff}section{margin-top:16px;padding:12px;border:1px solid #cbd5e1;border-radius:8px;break-inside:avoid}</style></head><body><h1>VÔLEI HUB</h1><h2>Resultado de partida</h2><p>${escapeQuick(result.reason)}</p><h2>Classificação final</h2><table><thead><tr><th>#</th><th>Equipe</th><th>Jogos</th><th>Vit.</th><th>Der.</th><th>Pontos</th><th>Saldo</th></tr></thead><tbody>${rows}</tbody></table><h2>Jogos por rodada</h2>${rounds}</body></html>`); report.document.close(); window.setTimeout(() => { report.focus(); report.print(); }, 300);
-}
-
 async function printFinishedQuickResult() {
   const result = finishedQuickResult;
   if (!result) return;
-  const Pdf = window.jspdf?.jsPDF;
-  if (!Pdf) { window.alert("Não foi possível preparar o PDF. Tente novamente."); return; }
-  const scoreMap = new Map(result.scores || []);
-  const playedRounds = (result.schedule || []).map((round, index) => ({ round, index })).filter(({ round, index }) => round.matches.some((_, gameIndex) => {
-    const score = scoreMap.get(scoreKey(index, gameIndex));
-    return Array.isArray(score) && score[0] !== "" && score[1] !== "" && score[0] != null && score[1] != null;
-  }));
-  const showPointsBalance = result.showPointsBalance !== false;
-  const pdf = new Pdf({ unit: "mm", format: "a4" }); let y = 18;
-  const line = (text, size = 10, bold = false) => {
-    pdf.setFont("helvetica", bold ? "bold" : "normal"); pdf.setFontSize(size); pdf.setTextColor(30, 41, 59);
-    const lines = pdf.splitTextToSize(String(text), 175);
-    if (y + lines.length * 6 > 280) { pdf.addPage(); y = 18; }
-    pdf.text(lines, 18, y); y += lines.length * 6;
-  };
-  const columns = showPointsBalance ? [10, 62, 18, 18, 18, 24, 24] : [10, 78, 22, 22, 22];
-  const headers = showPointsBalance ? ["#", "Equipe", "Jogos", "Vit.", "Der.", "Pontos", "Saldo"] : ["#", "Equipe", "Jogos", "Vit.", "Der."];
-  const tableRow = (cells, header = false) => {
-    if (y + 8 > 280) { pdf.addPage(); y = 18; }
-    let x = 18;
-    cells.forEach((cell, index) => {
-      pdf.setDrawColor(190, 200, 210); pdf.setFillColor(header ? 30 : 255, header ? 41 : 255, header ? 59 : 255);
-      pdf.rect(x, y, columns[index], 8, "FD"); pdf.setTextColor(header ? 255 : 30, header ? 255 : 41, header ? 255 : 59);
-      pdf.setFont("helvetica", header ? "bold" : "normal"); pdf.setFontSize(8);
-      const text = pdf.splitTextToSize(String(cell), columns[index] - 3)[0] || "";
-      pdf.text(text, index === 1 ? x + 1.5 : x + columns[index] / 2, y + 5.2, { align: index === 1 ? "left" : "center" }); x += columns[index];
-    }); y += 8;
-  };
-  line("VÔLEI HUB", 12, true); line("Resultado de partida", 20, true); line(result.reason); y += 3;
-  line("Classificação final", 15, true); tableRow(headers, true);
-  result.standings.forEach((team, index) => tableRow(showPointsBalance ? [`${index + 1}º`, team.name, team.games, team.wins, team.losses, team.points, `${team.difference >= 0 ? "+" : ""}${team.difference}`] : [`${index + 1}º`, team.name, team.games, team.wins, team.losses]));
-  if (result.exclusionAlert) {
-    y += 2;
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(8.5);
-    pdf.setTextColor(180, 83, 9);
-    const alertLines = pdf.splitTextToSize(result.exclusionAlert, 175);
-    if (y + alertLines.length * 4.5 > 280) { pdf.addPage(); y = 18; }
-    pdf.text(alertLines, 18, y);
-    y += alertLines.length * 4.5 + 2;
-  }
-  y += 8; line("Jogos por rodada", 15, true);
-  playedRounds.forEach(({ round, index }) => {
-    line(`Rodada ${index + 1}`, 13, true);
-    round.matches.forEach(([home, away], gameIndex) => { const score = scoreMap.get(scoreKey(index, gameIndex)); if (score?.[0] !== "" && score?.[1] !== "" && score?.[0] != null && score?.[1] != null) line(`${home}    ${score[0]} × ${score[1]}    ${away}`); });
-    if (round.bye) line(`Folga: ${round.bye}`, 9); y += 3;
-  });
-  const filename = gamePdfFileName(result.startedAt || result.finishedAt);
-  const file = new File([pdf.output("blob")], filename, { type: "application/pdf" });
   const shareTitle = "Resultado - Vôlei Hub";
-
   let rankingText = "";
   if (result.standings && result.standings.length) {
     rankingText = "\n\n*Classificação Final:*\n" + result.standings.slice(0, 5).map((team, idx) => {
@@ -622,8 +566,68 @@ async function printFinishedQuickResult() {
       return `${prefix} ${team.name} (${team.wins} vitórias)`;
     }).join("\n");
   }
-
   const whatsappMsg = `🏆 *VÔLEI HUB - RESULTADO DO JOGO* 🏆\n${result.reason || "Partida finalizada"}${rankingText}\n\n📎 O relatório completo em PDF foi baixado no dispositivo para envio!`;
+
+  let file = null;
+  const Pdf = window.jspdf?.jsPDF;
+  if (Pdf) {
+    try {
+      const scoreMap = new Map(result.scores || []);
+      const playedRounds = (result.schedule || []).map((round, index) => ({ round, index })).filter(({ round, index }) => round.matches.some((_, gameIndex) => {
+        const score = scoreMap.get(scoreKey(index, gameIndex));
+        return Array.isArray(score) && score[0] !== "" && score[1] !== "" && score[0] != null && score[1] != null;
+      }));
+      const showPointsBalance = result.showPointsBalance !== false;
+      const pdf = new Pdf({ unit: "mm", format: "a4" }); let y = 18;
+      const line = (text, size = 10, bold = false) => {
+        pdf.setFont("helvetica", bold ? "bold" : "normal"); pdf.setFontSize(size); pdf.setTextColor(30, 41, 59);
+        const lines = pdf.splitTextToSize(String(text), 175);
+        if (y + lines.length * 6 > 280) { pdf.addPage(); y = 18; }
+        pdf.text(lines, 18, y); y += lines.length * 6;
+      };
+      const columns = showPointsBalance ? [10, 62, 18, 18, 18, 24, 24] : [10, 78, 22, 22, 22];
+      const headers = showPointsBalance ? ["#", "Equipe", "Jogos", "Vit.", "Der.", "Pontos", "Saldo"] : ["#", "Equipe", "Jogos", "Vit.", "Der."];
+      const tableRow = (cells, header = false) => {
+        if (y + 8 > 280) { pdf.addPage(); y = 18; }
+        let x = 18;
+        cells.forEach((cell, index) => {
+          pdf.setDrawColor(190, 200, 210); pdf.setFillColor(header ? 30 : 255, header ? 41 : 255, header ? 59 : 255);
+          pdf.rect(x, y, columns[index], 8, "FD"); pdf.setTextColor(header ? 255 : 30, header ? 255 : 41, header ? 255 : 59);
+          pdf.setFont("helvetica", header ? "bold" : "normal"); pdf.setFontSize(8);
+          const text = pdf.splitTextToSize(String(cell), columns[index] - 3)[0] || "";
+          pdf.text(text, index === 1 ? x + 1.5 : x + columns[index] / 2, y + 5.2, { align: index === 1 ? "left" : "center" }); x += columns[index];
+        }); y += 8;
+      };
+      line("VÔLEI HUB", 12, true); line("Resultado de partida", 20, true); line(result.reason); y += 3;
+      line("Classificação final", 15, true); tableRow(headers, true);
+      result.standings.forEach((team, index) => tableRow(showPointsBalance ? [`${index + 1}º`, team.name, team.games, team.wins, team.losses, team.points, `${team.difference >= 0 ? "+" : ""}${team.difference}`] : [`${index + 1}º`, team.name, team.games, team.wins, team.losses]));
+      if (result.exclusionAlert) {
+        y += 2;
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(8.5);
+        pdf.setTextColor(180, 83, 9);
+        const alertLines = pdf.splitTextToSize(result.exclusionAlert, 175);
+        if (y + alertLines.length * 4.5 > 280) { pdf.addPage(); y = 18; }
+        pdf.text(alertLines, 18, y);
+        y += alertLines.length * 4.5 + 2;
+      }
+      y += 8; line("Jogos por rodada", 15, true);
+      playedRounds.forEach(({ round, index }) => {
+        line(`Rodada ${index + 1}`, 13, true);
+        round.matches.forEach(([home, away], gameIndex) => { const score = scoreMap.get(scoreKey(index, gameIndex)); if (score?.[0] !== "" && score?.[1] !== "" && score?.[0] != null && score?.[1] != null) line(`${home}    ${score[0]} × ${score[1]}    ${away}`); });
+        if (round.bye) line(`Folga: ${round.bye}`, 9); y += 3;
+      });
+      const filename = gamePdfFileName(result.startedAt || result.finishedAt);
+      try {
+        file = new File([pdf.output("blob")], filename, { type: "application/pdf" });
+      } catch (_) {
+        file = pdf.output("blob");
+        if (file) file.name = filename;
+      }
+    } catch (e) {
+      console.warn("Erro ao compilar PDF:", e);
+    }
+  }
 
   if (window.openPdfShareModal) {
     window.openPdfShareModal({
@@ -635,11 +639,8 @@ async function printFinishedQuickResult() {
     return;
   }
 
-  if (navigator.canShare?.({ files: [file] })) {
-    try { await navigator.share({ title: shareTitle, text: "Resultado da partida.", files: [file] }); return; }
-    catch (error) { if (error.name === "AbortError") return; }
-  }
-  pdf.save(filename);
+  const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(whatsappMsg)}`;
+  window.open(waUrl, "_blank");
 }
 
 async function refreshQuickTieBreakMode() {
