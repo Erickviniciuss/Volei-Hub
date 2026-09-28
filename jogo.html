@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=11" />
+    <link rel="stylesheet" href="style.css?v=18" />
     <link rel="icon" type="image/png" href="assets/favicon.png" />
   </head>
   <body class="app-loading" data-theme="dark">
@@ -42,7 +42,7 @@
           </div>
           <div class="field-group compact-field">
             <label for="quick-round-count">Rodadas do jogo</label>
-            <input id="quick-round-count" type="number" min="1" value="20" />
+            <input id="quick-round-count" type="number" min="1" value="10" />
           </div>
           <div class="field-group compact-field">
             <label for="quick-player-count">Pessoas por time</label>
@@ -58,7 +58,7 @@
       <section id="quick-game" class="quick-game" hidden aria-live="polite">
         <div class="quick-game-heading">
           <div><p class="eyebrow">EM ANDAMENTO</p><h2 id="current-round-title">Rodada 1</h2></div>
-          <div class="game-menu"><button id="quick-game-menu-toggle" class="game-menu-toggle" type="button" aria-expanded="false" aria-controls="quick-game-menu" aria-label="Abrir menu do jogo">☰</button><div id="quick-game-menu" class="game-menu-panel" hidden><button id="show-rounds" class="secondary-button" type="button">Ver todas as rodadas</button><button id="print-game" class="secondary-button" type="button">Enviar PDF</button><button id="copy-quick-groups" class="secondary-button" type="button">Copiar grupos</button><button id="adjust-game-toggle" class="secondary-button" type="button" aria-expanded="false">Ajustar jogo</button><button id="finish-game" class="danger-button" type="button">Encerrar jogo</button></div></div>
+          <div class="game-menu"><button id="quick-game-menu-toggle" class="game-menu-toggle" type="button" aria-expanded="false" aria-controls="quick-game-menu" aria-label="Abrir menu do jogo">☰</button><div id="quick-game-menu" class="game-menu-panel" hidden><button id="show-rounds" class="secondary-button" type="button">Ver todas as rodadas</button><button id="print-game" class="secondary-button" type="button">Enviar Rodadas</button><button id="send-quick-teams" class="secondary-button" type="button">Enviar Times</button><button id="adjust-game-toggle" class="secondary-button" type="button" aria-expanded="false">Ajustar jogo</button><button id="finish-game" class="danger-button" type="button">Encerrar jogo</button></div></div>
         </div>
         <div id="finish-confirm-panel" class="finish-confirm-panel" hidden><strong>Encerrar o jogo agora?</strong><p>Os resultados serão salvos e a partida não poderá continuar.</p><div><button id="cancel-finish-game" class="secondary-button" type="button">Cancelar</button><button id="confirm-finish-game" class="danger-button" type="button">Encerrar jogo</button></div></div>
         <p id="round-progress" class="quick-progress"></p>
@@ -66,7 +66,32 @@
         <button id="confirm-round" class="confirm-round" type="button" disabled>Confirmar placares e próxima rodada</button>
         <p id="score-message" class="score-message" role="alert"></p>
         <section class="live-ranking" aria-live="polite"><h3>Ranking atual</h3><div id="live-ranking-list" class="ranking-list"></div></section>
-        <div class="share-game-code"><span>CÓDIGO DE ACOMPANHAMENTO</span><strong id="share-code-value">--</strong><div class="share-game-actions"><button id="copy-share-code" class="secondary-button" type="button">Copiar código</button><button id="copy-share-link" class="secondary-button" type="button">Copiar link</button></div><small id="share-code-status"></small></div>
+        <div class="share-game-code">
+          <span>CÓDIGO DE ACOMPANHAMENTO</span>
+          <strong id="share-code-value">--</strong>
+          <div class="share-game-actions">
+            <div class="qr-dropdown-container">
+              <button id="copy-share-code" class="secondary-button qr-dropdown-trigger" type="button" aria-expanded="false">Gerar QR-Code</button>
+              <div id="qr-dropdown-menu" class="qr-dropdown-menu" hidden>
+                <div class="qr-dropdown-header">
+                  <span class="qr-dropdown-title">ACOMPANHAMENTO AO VIVO</span>
+                  <button id="qr-dropdown-close" class="qr-dropdown-close" type="button" aria-label="Fechar">×</button>
+                </div>
+                <p class="qr-dropdown-desc">Escaneie com a câmera para acompanhar a partida em tempo real.</p>
+                <div class="qr-canvas-box">
+                  <canvas id="qr-code-canvas" width="180" height="180"></canvas>
+                </div>
+                <div class="qr-dropdown-code-badge">
+                  <small>CÓDIGO:</small>
+                  <strong id="qr-code-display-value">--</strong>
+                </div>
+                <button id="qr-dropdown-copy-link" class="secondary-button" type="button">Copiar link</button>
+              </div>
+            </div>
+            <button id="copy-share-link" class="secondary-button" type="button">Copiar link</button>
+          </div>
+          <small id="share-code-status"></small>
+        </div>
         <div id="live-settings" class="live-settings" hidden>
           <div class="settings-row"><p class="eyebrow">AJUSTAR PRÓXIMAS RODADAS</p></div>
           <div class="field-row">
@@ -96,14 +121,16 @@
       </section>
       <div class="table-utility-actions"><a class="home-button" href="index.html"><span aria-hidden="true"><img src="assets/casa.png" alt="" /></span> Menu principal</a></div>
     </main>
-    <footer class="site-footer">© 2026 RST Cipher • Versão 2.0.6</footer>
+    <footer class="site-footer">© 2026 RST Cipher • Versão 2.1.0</footer>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin="anonymous"></script>
     <script src="supabase-config.js"></script>
     <script src="theme.js"></script>
     <script src="table-auth.js"></script>
     <script src="game-storage.js?v=5"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="pdf-share.js?v=2"></script>
-    <script src="jogo.js?v=26"></script>
+    <script src="qrious.min.js"></script>
+    <script src="qr-modal.js?v=3"></script>
+    <script src="pdf-share.js?v=16"></script>
+    <script src="jogo.js?v=35"></script>
   </body>
 </html>

@@ -14,8 +14,8 @@ function escapeViewer(value) { return String(value).replace(/[&<>'"]/g, (char) =
 function scoreKeyViewer(round, game) { return `${round}-${game}`; }
 function viewerStats(team) { return `<small class="ranking-stats"><span><b>Vit.</b>${team.wins}</span><span><b>Der.</b>${team.losses}</span><span><b>Jogos</b>${team.games}</span><span><b>Pontos</b>${team.points}</span><span><b>Saldo</b>${team.difference >= 0 ? "+" : ""}${team.difference}</span></small>`; }
 function viewerTeamDropdown(game, team, away = false) {
-  const teamIndex = (game.teams || []).indexOf(team);
-  const players = game.players?.[teamIndex] || [];
+  const teamIndex = (game.teams || []).findIndex((t) => String(t || "").trim() === String(team || "").trim());
+  const players = teamIndex >= 0 ? (game.players?.[teamIndex] || []) : [];
   const content = players.length ? `<ul>${players.map((player) => `<li>${escapeViewer(player)}</li>`).join("")}</ul>` : "<span>Nenhum participante cadastrado.</span>";
   return `<div class="team-dropdown ${away ? "team-away" : ""}"><details><summary>${escapeViewer(team)}</summary><div class="dropdown-menu"><strong>${escapeViewer(team)}</strong>${content}</div></details></div>`;
 }
@@ -66,7 +66,7 @@ function renderViewer(game) {
   const standings = standingsFor(game);
   const leader = standings[0];
   const isLeader = (team) => leader?.wins > 0 && (game.tieBreakMode === "wins" ? team.wins === leader.wins : team.wins === leader.wins && team.difference === leader.difference && team.points === leader.points);
-  document.querySelector("#viewer-ranking").innerHTML = standings.map((team, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong>${isLeader(team) ? '<span class="leader-crown" title="Líder">♛</span>' : ""}<span>${escapeViewer(team.name)}</span>${viewerStats(team)}</div>`).join("");
+  document.querySelector("#viewer-ranking").innerHTML = standings.map((team, index) => `<div class="ranking-row ${index < 3 ? "podium" : ""}"><strong>${index + 1}º</strong>${isLeader(team) ? '<span class="leader-crown" title="Líder">♛</span>' : ""}${viewerTeamDropdown(game, team.name)}${viewerStats(team)}</div>`).join("");
   const scores = new Map(game.scores || []);
   const currentGame = Number(game.gameType === "points" ? game.pointMatch : game.confirmedGameCount) || 0;
   document.querySelector("#viewer-rounds").innerHTML = game.schedule.map((round, roundIndex) => `<article class="round overview-round ${roundIndex === game.currentRound ? "is-current" : ""}"><header class="round-title">Rodada ${roundIndex + 1}<span>${roundIndex === game.currentRound ? "ATUAL" : roundIndex < game.currentRound ? "CONCLUÍDA" : "AGUARDANDO"}</span></header>${round.matches.map(([home, away], gameIndex) => { const score = scores.get(scoreKeyViewer(roundIndex, gameIndex)); const value = score ? (Array.isArray(score) ? `${score[0]} × ${score[1]}` : `${score.home} × ${score.away}`) : "×"; return `<div class="match overview-match ${roundIndex === game.currentRound && gameIndex === currentGame ? "is-current-match" : ""}">${viewerTeamDropdown(game, home)}<span class="overview-score">${value}</span>${viewerTeamDropdown(game, away, true)}</div>`; }).join("")}${round.bye ? `<div class="bye">Folga: ${viewerTeamDropdown(game, round.bye)}</div>` : ""}</article>`).join("");
@@ -152,3 +152,16 @@ document.querySelector("#viewer-rounds").addEventListener("click", (event) => {
   if (!selected) return;
   document.querySelectorAll("#viewer-rounds details[open]").forEach((details) => { if (details !== selected) details.removeAttribute("open"); });
 });
+
+document.querySelector("#viewer-ranking")?.addEventListener("click", (event) => {
+  const selected = event.target.closest("details");
+  if (!selected) return;
+  document.querySelectorAll("#viewer-ranking details[open]").forEach((details) => { if (details !== selected) details.removeAttribute("open"); });
+});
+
+document.addEventListener("click", (event) => {
+  if (!event.target.closest("details")) {
+    document.querySelectorAll(".viewer-shell details[open]").forEach((details) => details.removeAttribute("open"));
+  }
+});
+

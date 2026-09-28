@@ -184,49 +184,49 @@ async function printGeneratedTable() {
   if (!generatedSchedule.length) { window.alert("Gere a tabela antes de enviar o PDF."); return; }
   const shareTitle = "Tabela de jogos - Vôlei Hub";
   const whatsappMsg = `🏐 *VÔLEI HUB - TABELA DE JOGOS* 🏐\n📅 ${new Date().toLocaleDateString("pt-BR")}\n${generatedSchedule.length} rodadas geradas.\n\n📎 O PDF completo foi baixado no dispositivo para envio!`;
+  
   let file = null;
-  const Pdf = window.jspdf?.jsPDF;
-  if (Pdf) {
-    try {
-      const pdf = new Pdf({ unit: "mm", format: "a4" });
-      let y = 18;
-      const addLine = (text, size = 10, bold = false) => {
-        pdf.setFont("helvetica", bold ? "bold" : "normal"); pdf.setFontSize(size);
-        const lines = pdf.splitTextToSize(text, 175);
-        if (y + lines.length * 6 > 280) { pdf.addPage(); y = 18; }
-        pdf.text(lines, 18, y); y += lines.length * 6;
-      };
-      addLine("VÔLEI HUB", 12, true);
-      addLine("Tabela de jogos", 22, true); y += 3;
-      generatedSchedule.forEach((round, index) => {
-        addLine(`Rodada ${index + 1}`, 14, true);
-        round.matches.forEach(([home, away]) => addLine(`${home}    ×    ${away}`));
-        if (round.bye) addLine(`Folga: ${round.bye}`, 9);
-        y += 4;
-      });
-      const fileName = tablePdfFileName();
-      try {
-        file = new File([pdf.output("blob")], fileName, { type: "application/pdf" });
-      } catch (_) {
-        file = pdf.output("blob");
-        if (file) file.name = fileName;
-      }
-    } catch (e) {
-      console.warn("Erro ao compilar PDF:", e);
-    }
+  let fileOptionsRef = null;
+  if (window.buildVolleyPdf) {
+    const teams = [...document.querySelectorAll(".team-name")].map((input, index) => input.value.trim() || `Equipe ${index + 1}`);
+    const players = teams.map((_, teamIndex) => [...document.querySelectorAll(`.player-name[data-team="${teamIndex}"]`)].map((input) => input.value.trim()).filter(Boolean));
+    const pdfOptions = {
+      title: "Tabela de jogos",
+      subtitle: `${generatedSchedule.length} rodadas geradas • ${new Date().toLocaleDateString("pt-BR")}`,
+      teams: teams,
+      players: players,
+      schedule: generatedSchedule,
+      scores: null,
+      onlyPlayed: false,
+      date: new Date()
+    };
+    const res = window.buildVolleyPdf(pdfOptions);
+    file = res?.file;
+    fileOptionsRef = pdfOptions;
   }
+
+  const fullRoundsText = window.formatVolleyRoundsText
+    ? window.formatVolleyRoundsText({
+        schedule: generatedSchedule,
+        scores: null,
+        title: "Tabela de Jogos",
+        subtitle: `${generatedSchedule.length} rodadas geradas`,
+        date: new Date()
+      })
+    : whatsappMsg;
 
   if (window.openPdfShareModal) {
     window.openPdfShareModal({
       file,
+      pdfOptions: fileOptionsRef,
       title: shareTitle,
-      text: "Tabela de jogos do Vôlei Hub.",
-      whatsappText: whatsappMsg
+      text: fullRoundsText,
+      whatsappText: fullRoundsText
     });
     return;
   }
 
-  const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(whatsappMsg)}`;
+  const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(fullRoundsText)}`;
   window.open(waUrl, "_blank");
 }
 

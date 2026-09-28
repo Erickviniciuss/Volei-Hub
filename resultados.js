@@ -2,6 +2,15 @@ const resultsList = document.querySelector("#results-list");
 const resultSyncStatus = document.querySelector("#result-sync-status");
 const resultsDateFilter = document.querySelector("#results-date-filter");
 const resultsTypeFilter = document.querySelector("#results-type-filter");
+const clearFilterBtn = document.querySelector("#clear-results-filter");
+
+function updateFilterClearVisibility() {
+  const hasFilter = Boolean(resultsDateFilter?.value) || (resultsTypeFilter?.value && resultsTypeFilter.value !== "all");
+  if (clearFilterBtn) {
+    clearFilterBtn.hidden = !hasFilter;
+  }
+}
+
 let displayedResults = [];
 let allResults = [];
 let currentCloudPage = 0;
@@ -92,6 +101,7 @@ function resultLeader(team, result) {
   return team.wins === leader.wins && team.difference === leader.difference && team.points === leader.points;
 }
 function renderResults() {
+  updateFilterClearVisibility();
   const selectedDate = resultsDateFilter.value;
   const selectedType = resultsTypeFilter.value;
   const results = allResults.filter((result) => (!selectedDate || localDate(result.finishedAt) === selectedDate) && (selectedType === "all" || resultGameType(result) === selectedType));
@@ -111,19 +121,11 @@ function renderResults() {
 }
 
 async function printResult(result) {
-  const playedRoundIndexes = (result.schedule || []).map((_, roundIndex) => roundIndex).filter((roundIndex) => resultRoundHasPlayedGame(result, roundIndex));
-  const showPointsBalance = result.showPointsBalance !== false;
   if (!result.schedule) { window.alert("Este histórico foi salvo antes do relatório detalhado."); return; }
-  const rows = result.standings.map((team, index) => { const visual = resultVisualStats(result, team); return `<tr><td>${index + 1}º</td><td>${escapeResult(team.name)}</td><td>${visual.games}</td><td>${team.wins}</td><td>${visual.losses}</td>${showPointsBalance ? `<td>${team.points}</td><td>${team.difference >= 0 ? "+" : ""}${team.difference}</td>` : ""}</tr>`; }).join("");
-  const teamNames = result.teams?.length ? result.teams : result.standings.map((team) => team.name);
-  const totalPlayers = result.playerCount || Math.max(4, ...(result.players || []).map((players) => players.length));
+  const showPointsBalance = result.showPointsBalance !== false;
+  const teamNames = result.teams?.length ? result.teams : result.standings?.map((team) => team.name) || [];
   const topPlayers = resultGameType(result) === "points" ? pointPlayerRanking(result).slice(0, 10) : [];
-  const participants = teamNames.map((team, teamIndex) => {
-    const names = Array.from({ length: totalPlayers }, (_, playerIndex) => result.players?.[teamIndex]?.[playerIndex] || "Vazio");
-    return `<section class="team"><h3>${escapeResult(team)}</h3><p>${names.map(escapeResult).join(" · ")}</p></section>`;
-  }).join("");
-  const rounds = result.schedule.map((round, roundIndex) => `<section class="round"><h2>Rodada ${roundIndex + 1}</h2>${round.matches.map(([home, away], gameIndex) => { const movements = pointMovements(result, roundIndex, gameIndex); return `<div class="match"><span>${escapeResult(home)}</span><strong>${scoreFor(result, roundIndex, gameIndex)}</strong><span>${escapeResult(away)}</span></div>${movements.length ? `<div class="print-movements"><b>Histórico de movimentos</b>${movements.map((movement, index) => `<p>${index + 1}º lance · ${escapeResult(movementText(movement))}</p>`).join("")}</div>` : ""}`; }).join("")}${round.bye ? `<p>Folga: <b>${escapeResult(round.bye)}</b></p>` : ""}</section>`).join("");
-  const topPlayersHtml = topPlayers.length ? `<h1>Top 10 jogadores</h1><ol>${topPlayers.map((player) => `<li>${escapeResult(player.name)} · ${escapeResult(player.team)} · ${player.points} pontos</li>`).join("")}</ol>` : "";
+  
   let rankingText = "";
   if (result.standings && result.standings.length) {
     rankingText = "\n\n*Classificação Final:*\n" + result.standings.slice(0, 5).map((team, idx) => {
@@ -136,109 +138,39 @@ async function printResult(result) {
   const whatsappMsg = `🏆 *VÔLEI HUB - RESULTADO DE PARTIDA* 🏆\n${result.reason || "Histórico de jogo"}${rankingText}\n\n🏐 Gerado pelo Vôlei Hub`;
 
   let file = null;
-  const Pdf = window.jspdf?.jsPDF;
-  if (Pdf) {
-    try {
-      const pdf = new Pdf({ unit: "mm", format: "a4" }); let y = 18;
-      const line = (text, size = 10, bold = false) => {
-        pdf.setFont("helvetica", bold ? "bold" : "normal"); pdf.setFontSize(size);
-        const lines = pdf.splitTextToSize(text, 175);
-        if (y + lines.length * 6 > 280) { pdf.addPage(); y = 18; }
-        pdf.text(lines, 18, y); y += lines.length * 6;
+  if (window.buildVolleyPdf) {
+    // Processar os standings usando visualStats caso losses ou games precisem ser recalculados
+    const processedStandings = (result.standings || []).map((team) => {
+      const visual = resultVisualStats(result, team);
+      return {
+        ...team,
+        games: visual.games,
+        losses: visual.losses
       };
-      const compactMovements = (movements) => {
-        const writeCompact = (text) => {
-          pdf.setFont("helvetica", "normal"); pdf.setFontSize(6);
-          const lines = pdf.splitTextToSize(text, 175);
-          if (y + lines.length * 2.6 > 280) { pdf.addPage(); y = 18; }
-          pdf.text(lines, 18, y); y += lines.length * 2.6;
-        };
-        pdf.setFont("helvetica", "normal"); pdf.setFontSize(6);
-        let row = [];
-        movements.forEach((movement, index) => {
-          const entry = `${index + 1}º ${movement.team}: ${movement.player}${movement.time ? ` ${movement.time}` : ""} ${movement.homeScore} × ${movement.awayScore}`;
-          const candidate = [...row, entry].join(" | ");
-          if (row.length && (row.length === 6 || pdf.getTextWidth(candidate) > 175)) { writeCompact(row.join(" | ")); row = [entry]; }
-          else row.push(entry);
-        });
-        if (row.length) writeCompact(row.join(" | "));
-      };
-      line("VÔLEI HUB", 12, true); line("Resultado de partida", 20, true); line(result.reason); y += 3;
-      line("Classificação final", 15, true);
-      const columns = showPointsBalance ? [10, 62, 18, 18, 18, 24, 24] : [10, 78, 22, 22, 22];
-      const headers = showPointsBalance ? ["#", "Equipe", "Jogos", "Vit.", "Der.", "Pontos", "Saldo"] : ["#", "Equipe", "Jogos", "Vit.", "Der."];
-      const drawRankingRow = (cells, header = false) => {
-        const height = 8;
-        if (y + height > 280) { pdf.addPage(); y = 18; }
-        let x = 18;
-        cells.forEach((cell, index) => {
-          pdf.setDrawColor(190, 200, 210);
-          pdf.setFillColor(header ? 30 : 255, header ? 41 : 255, header ? 59 : 255);
-          pdf.rect(x, y, columns[index], height, "F");
-          pdf.rect(x, y, columns[index], height, "S");
-          pdf.setTextColor(header ? 255 : 30, header ? 255 : 41, header ? 255 : 59);
-          pdf.setFont("helvetica", header ? "bold" : "normal"); pdf.setFontSize(header ? 8 : 8.5);
-          const text = pdf.splitTextToSize(String(cell), columns[index] - 3)[0] || "";
-          const centered = index !== 1;
-          if (centered) pdf.text(text, x + columns[index] / 2, y + 5.2, { align: "center" });
-          else pdf.text(text, x + 1.5, y + 5.2);
-          x += columns[index];
-        });
-        y += height;
-      };
-      drawRankingRow(headers, true);
-      result.standings.forEach((team, index) => {
-        const visual = resultVisualStats(result, team);
-        drawRankingRow(showPointsBalance ? [`${index + 1}º`, team.name, visual.games, team.wins, visual.losses, team.points, `${team.difference >= 0 ? "+" : ""}${team.difference}`] : [`${index + 1}º`, team.name, visual.games, team.wins, visual.losses]);
-      });
-      if (result.exclusionAlert) {
-        y += 2;
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(8.5);
-        pdf.setTextColor(180, 83, 9);
-        const alertLines = pdf.splitTextToSize(result.exclusionAlert, 175);
-        if (y + alertLines.length * 4.5 > 280) { pdf.addPage(); y = 18; }
-        pdf.text(alertLines, 18, y);
-        y += alertLines.length * 4.5 + 2;
-      }
-      pdf.setTextColor(30, 41, 59);
-      if (topPlayers.length) {
-        y += 12; line("Top 10 jogadores", 15, true);
-        topPlayers.forEach((player, index) => line(`${index + 1}º ${player.name} · ${player.team} · ${player.points} pontos`));
-      }
-      y += 12; line("Participantes por equipe", 15, true);
-      teamNames.forEach((team, teamIndex) => {
-        const names = Array.from({ length: totalPlayers }, (_, playerIndex) => result.players?.[teamIndex]?.[playerIndex] || "Vazio");
-        line(`${team}: ${names.join(", ")}`);
-      });
-      y += 3; line("Jogos por rodada", 15, true);
-      playedRoundIndexes.forEach((roundIndex) => {
-        const round = result.schedule[roundIndex];
-        line(`Rodada ${roundIndex + 1}`, 13, true);
-        round.matches.forEach(([home, away], gameIndex) => {
-          line(`${home}    ${scoreFor(result, roundIndex, gameIndex)}    ${away}`);
-          const movements = pointMovements(result, roundIndex, gameIndex);
-          compactMovements(movements);
-          if (movements.length) y += 4;
-        });
-        if (round.bye) line(`Folga: ${round.bye}`, 9);
-        y += 3;
-      });
-      const fileName = resultPdfFileName(result.startedAt || result.finishedAt);
-      try {
-        file = new File([pdf.output("blob")], fileName, { type: "application/pdf" });
-      } catch (_) {
-        file = pdf.output("blob");
-        if (file) file.name = fileName;
-      }
-    } catch (err) {
-      console.warn("Erro ao compilar PDF:", err);
-    }
+    });
+
+    const pdfOptions = {
+      title: "Resultado de partida",
+      subtitle: result.reason || "Histórico de partida",
+      standings: processedStandings,
+      showPointsBalance: showPointsBalance,
+      exclusionAlert: result.exclusionAlert,
+      topPlayers: topPlayers,
+      teams: teamNames,
+      players: result.players,
+      schedule: result.schedule,
+      scores: result.scores,
+      onlyPlayed: true,
+      date: result.startedAt || result.finishedAt
+    };
+    const res = window.buildVolleyPdf(pdfOptions);
+    file = res?.file;
   }
 
   if (window.openPdfShareModal) {
     window.openPdfShareModal({
       file,
+      pdfOptions,
       title: shareTitle,
       text: "Resultado da partida.",
       whatsappText: whatsappMsg
@@ -323,8 +255,17 @@ async function loadResults() {
   }
 }
 
-resultsDateFilter.addEventListener("change", () => { renderResults(); });
-resultsTypeFilter.addEventListener("change", () => { renderResults(); });
-document.querySelector("#clear-results-filter").addEventListener("click", () => { resultsDateFilter.value = ""; resultsTypeFilter.value = "all"; renderResults(); });
+resultsDateFilter.addEventListener("input", () => { updateFilterClearVisibility(); renderResults(); });
+resultsDateFilter.addEventListener("change", () => { updateFilterClearVisibility(); renderResults(); });
+resultsTypeFilter.addEventListener("change", () => { updateFilterClearVisibility(); renderResults(); });
+if (clearFilterBtn) {
+  clearFilterBtn.addEventListener("click", () => {
+    resultsDateFilter.value = "";
+    resultsTypeFilter.value = "all";
+    updateFilterClearVisibility();
+    renderResults();
+  });
+}
 
 loadResults();
+

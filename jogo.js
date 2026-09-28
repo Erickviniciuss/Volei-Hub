@@ -55,31 +55,48 @@ function gamePdfFileName(date = new Date()) {
   return `Volei Hub - ${pad(value.getDate())}-${pad(value.getMonth() + 1)}-${value.getFullYear()} ${pad(value.getHours())}h${pad(value.getMinutes())}.pdf`;
 }
 
-async function copyQuickGroups() {
+async function sendQuickTeams() {
   const teams = currentTeams.length ? currentTeams : [...document.querySelectorAll(".quick-team-name")].map((input, index) => input.value.trim() || `Equipe ${index + 1}`);
   const players = currentPlayers.length ? currentPlayers : getQuickPlayers();
   const gameDate = gameStartedAt ? new Date(gameStartedAt).toLocaleString("pt-BR") : new Date().toLocaleString("pt-BR");
-  const text = `VÔLEI HUB · GRUPOS\n\n${teams.map((team, index) => {
-    const roster = players[index]?.length ? players[index] : ["Vazio"];
-    return `${team}\n${roster.map((person) => `• ${person}`).join("\n")}`;
-  }).join("\n\n")}\n\nData do jogo: ${gameDate}`;
-  const button = document.querySelector("#copy-quick-groups");
-  try {
-    await navigator.clipboard.writeText(text);
-    button.textContent = "Grupos copiados";
-  } catch {
-    const area = document.createElement("textarea"); area.value = text; area.style.position = "fixed"; area.style.opacity = "0";
-    document.body.append(area); area.select(); document.execCommand("copy"); area.remove();
-    button.textContent = "Grupos copiados";
+
+  const formattedText = `🏐 *VÔLEI HUB · EQUIPES E INTEGRANTES* 🏐\n📅 ${gameDate}\n\n${teams.map((team, index) => {
+    const roster = players[index]?.length ? players[index] : ["Participantes não informados"];
+    return `*${team}*\n${roster.map((person) => `• ${person}`).join("\n")}`;
+  }).join("\n\n")}`;
+
+  let file = null;
+  const pdfOptions = {
+    title: "Equipes e Integrantes",
+    subtitle: `Modalidade: Jogo por Resultado • Data: ${gameDate}`,
+    teams: teams,
+    players: players,
+    teamsOnly: true,
+    date: gameStartedAt || new Date()
+  };
+  if (window.buildVolleyPdf) {
+    const res = window.buildVolleyPdf(pdfOptions);
+    file = res?.file;
   }
-  window.setTimeout(() => { button.textContent = "Copiar grupos"; }, 1800);
+
+  if (window.openPdfShareModal) {
+    window.openPdfShareModal({
+      file,
+      pdfOptions,
+      title: "Equipes e Integrantes - Vôlei Hub",
+      text: formattedText,
+      whatsappText: formattedText
+    });
+    return;
+  }
 }
+const copyQuickGroups = sendQuickTeams;
 
 function makeQuickTeamInputs() {
   const previous = [...document.querySelectorAll(".quick-team-name")].map((input) => input.value);
   const total = Number(quickTeamCount.value);
   const max = maxQuickRounds(total);
-  quickRoundCount.value = normalizeQuickRounds(Number(quickRoundCount.value) || 20, max, quickUnlimited.checked);
+  quickRoundCount.value = normalizeQuickRounds(Number(quickRoundCount.value) || 10, max, quickUnlimited.checked);
   quickRoundCount.min = quickUnlimited.checked ? 1 : max;
   quickRoundCount.step = quickUnlimited.checked ? 1 : max;
   quickTeamNames.innerHTML = Array.from({ length: total }, (_, index) => `<label class="name-field">TIME ${index + 1}<input class="quick-team-name" type="text" value="${escapeQuick(previous[index] || `Equipe ${index + 1}`)}" maxlength="28" /></label>`).join("");
@@ -460,52 +477,44 @@ function saveRetroScores() {
 
 async function printQuickGamePdf() {
   if (!quickSchedule.length) return;
-  const shareTitle = "Tabelas do Jogo por Resultado - Vôlei Hub";
-  const whatsappMsg = `🏐 *VÔLEI HUB - TABELAS DE JOGOS* 🏐\nModalidade: Jogo por Resultado\n📅 ${new Date().toLocaleDateString("pt-BR")}\n\n📎 O PDF completo foi baixado no dispositivo para envio!`;
+  const shareTitle = "Rodadas da Partida - Vôlei Hub";
+  const gameDate = gameStartedAt || new Date();
+  const fullRoundsText = window.formatVolleyRoundsText
+    ? window.formatVolleyRoundsText({
+        schedule: quickSchedule,
+        scores: scores,
+        title: "Rodadas da Partida",
+        subtitle: "Modalidade: Jogo por Resultado",
+        date: gameDate
+      })
+    : `🏐 *VÔLEI HUB - RODADAS DA PARTIDA* 🏐\n📅 ${new Date().toLocaleDateString("pt-BR")}`;
+  
   let file = null;
-  const Pdf = window.jspdf?.jsPDF;
-  if (Pdf) {
-    try {
-      const pdf = new Pdf({ unit: "mm", format: "a4" }); let y = 18;
-      const line = (text, size = 10, bold = false) => {
-        pdf.setFont("helvetica", bold ? "bold" : "normal"); pdf.setFontSize(size);
-        const lines = pdf.splitTextToSize(text, 175);
-        if (y + lines.length * 6 > 280) { pdf.addPage(); y = 18; }
-        pdf.text(lines, 18, y); y += lines.length * 6;
-      };
-      line("VÔLEI HUB", 12, true); line("Tabelas do Jogo por Resultado", 20, true);
-      quickSchedule.forEach((round, roundIndex) => {
-        line(`Rodada ${roundIndex + 1}`, 13, true);
-        round.matches.forEach(([home, away], gameIndex) => {
-          const result = scores.get(scoreKey(roundIndex, gameIndex)); const score = result && result[0] !== "" && result[1] !== "" ? `${result[0]} × ${result[1]}` : "×";
-          line(`${home}    ${score}    ${away}`);
-        });
-        if (round.bye) line(`Folga: ${round.bye}`, 9);
-        y += 3;
-      });
-      const fileName = gamePdfFileName(gameStartedAt || new Date());
-      try {
-        file = new File([pdf.output("blob")], fileName, { type: "application/pdf" });
-      } catch (_) {
-        file = pdf.output("blob");
-        if (file) file.name = fileName;
-      }
-    } catch (e) {
-      console.warn("Erro ao compilar PDF:", e);
-    }
+  const pdfOptions = {
+    title: "Rodadas da Partida",
+    subtitle: `Modalidade: Jogo por Resultado • ${new Date().toLocaleDateString("pt-BR")}`,
+    schedule: quickSchedule,
+    scores: scores,
+    onlyPlayed: false,
+    date: gameDate
+  };
+  if (window.buildVolleyPdf) {
+    const res = window.buildVolleyPdf(pdfOptions);
+    file = res?.file;
   }
 
   if (window.openPdfShareModal) {
     window.openPdfShareModal({
       file,
+      pdfOptions,
       title: shareTitle,
-      text: "Tabelas de jogos do Vôlei Hub.",
-      whatsappText: whatsappMsg
+      text: fullRoundsText,
+      whatsappText: fullRoundsText
     });
     return;
   }
 
-  const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(whatsappMsg)}`;
+  const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(fullRoundsText)}`;
   window.open(waUrl, "_blank");
 }
 
@@ -569,69 +578,30 @@ async function printFinishedQuickResult() {
   const whatsappMsg = `🏆 *VÔLEI HUB - RESULTADO DO JOGO* 🏆\n${result.reason || "Partida finalizada"}${rankingText}\n\n📎 O relatório completo em PDF foi baixado no dispositivo para envio!`;
 
   let file = null;
-  const Pdf = window.jspdf?.jsPDF;
-  if (Pdf) {
-    try {
-      const scoreMap = new Map(result.scores || []);
-      const playedRounds = (result.schedule || []).map((round, index) => ({ round, index })).filter(({ round, index }) => round.matches.some((_, gameIndex) => {
-        const score = scoreMap.get(scoreKey(index, gameIndex));
-        return Array.isArray(score) && score[0] !== "" && score[1] !== "" && score[0] != null && score[1] != null;
-      }));
-      const showPointsBalance = result.showPointsBalance !== false;
-      const pdf = new Pdf({ unit: "mm", format: "a4" }); let y = 18;
-      const line = (text, size = 10, bold = false) => {
-        pdf.setFont("helvetica", bold ? "bold" : "normal"); pdf.setFontSize(size); pdf.setTextColor(30, 41, 59);
-        const lines = pdf.splitTextToSize(String(text), 175);
-        if (y + lines.length * 6 > 280) { pdf.addPage(); y = 18; }
-        pdf.text(lines, 18, y); y += lines.length * 6;
-      };
-      const columns = showPointsBalance ? [10, 62, 18, 18, 18, 24, 24] : [10, 78, 22, 22, 22];
-      const headers = showPointsBalance ? ["#", "Equipe", "Jogos", "Vit.", "Der.", "Pontos", "Saldo"] : ["#", "Equipe", "Jogos", "Vit.", "Der."];
-      const tableRow = (cells, header = false) => {
-        if (y + 8 > 280) { pdf.addPage(); y = 18; }
-        let x = 18;
-        cells.forEach((cell, index) => {
-          pdf.setDrawColor(190, 200, 210); pdf.setFillColor(header ? 30 : 255, header ? 41 : 255, header ? 59 : 255);
-          pdf.rect(x, y, columns[index], 8, "FD"); pdf.setTextColor(header ? 255 : 30, header ? 255 : 41, header ? 255 : 59);
-          pdf.setFont("helvetica", header ? "bold" : "normal"); pdf.setFontSize(8);
-          const text = pdf.splitTextToSize(String(cell), columns[index] - 3)[0] || "";
-          pdf.text(text, index === 1 ? x + 1.5 : x + columns[index] / 2, y + 5.2, { align: index === 1 ? "left" : "center" }); x += columns[index];
-        }); y += 8;
-      };
-      line("VÔLEI HUB", 12, true); line("Resultado de partida", 20, true); line(result.reason); y += 3;
-      line("Classificação final", 15, true); tableRow(headers, true);
-      result.standings.forEach((team, index) => tableRow(showPointsBalance ? [`${index + 1}º`, team.name, team.games, team.wins, team.losses, team.points, `${team.difference >= 0 ? "+" : ""}${team.difference}`] : [`${index + 1}º`, team.name, team.games, team.wins, team.losses]));
-      if (result.exclusionAlert) {
-        y += 2;
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(8.5);
-        pdf.setTextColor(180, 83, 9);
-        const alertLines = pdf.splitTextToSize(result.exclusionAlert, 175);
-        if (y + alertLines.length * 4.5 > 280) { pdf.addPage(); y = 18; }
-        pdf.text(alertLines, 18, y);
-        y += alertLines.length * 4.5 + 2;
-      }
-      y += 8; line("Jogos por rodada", 15, true);
-      playedRounds.forEach(({ round, index }) => {
-        line(`Rodada ${index + 1}`, 13, true);
-        round.matches.forEach(([home, away], gameIndex) => { const score = scoreMap.get(scoreKey(index, gameIndex)); if (score?.[0] !== "" && score?.[1] !== "" && score?.[0] != null && score?.[1] != null) line(`${home}    ${score[0]} × ${score[1]}    ${away}`); });
-        if (round.bye) line(`Folga: ${round.bye}`, 9); y += 3;
-      });
-      const filename = gamePdfFileName(result.startedAt || result.finishedAt);
-      try {
-        file = new File([pdf.output("blob")], filename, { type: "application/pdf" });
-      } catch (_) {
-        file = pdf.output("blob");
-        if (file) file.name = filename;
-      }
-    } catch (e) {
-      console.warn("Erro ao compilar PDF:", e);
-    }
+  let pdfOptions = null;
+  if (window.buildVolleyPdf) {
+    const scoreMap = new Map(result.scores || []);
+    pdfOptions = {
+      title: "Resultado de partida",
+      subtitle: result.reason || "Partida finalizada",
+      standings: result.standings,
+      showPointsBalance: result.showPointsBalance !== false,
+      exclusionAlert: result.exclusionAlert,
+      teams: result.teams || result.standings?.map((s) => s.name),
+      players: result.players,
+      schedule: result.schedule,
+      scores: scoreMap,
+      onlyPlayed: true,
+      date: result.startedAt || result.finishedAt
+    };
+    const res = window.buildVolleyPdf(pdfOptions);
+    file = res?.file;
   }
 
   if (window.openPdfShareModal) {
     window.openPdfShareModal({
       file,
+      pdfOptions,
       title: shareTitle,
       text: "Resultado da partida.",
       whatsappText: whatsappMsg
@@ -713,7 +683,8 @@ document.querySelector("#apply-live-settings").addEventListener("click", applyLi
 document.querySelector("#show-rounds").addEventListener("click", () => { document.querySelector("#live-settings").hidden = true; document.querySelector("#adjust-game-toggle").setAttribute("aria-expanded", "false"); renderOverview(); overview.hidden = false; window.requestAnimationFrame(() => (overviewRounds.querySelector(".is-current") || overview).scrollIntoView({ behavior: "smooth", block: "start" })); });
 document.querySelector("#print-game").addEventListener("click", printQuickGamePdf);
 document.querySelector("#finished-print-game").addEventListener("click", printFinishedQuickResult);
-document.querySelector("#copy-quick-groups").addEventListener("click", copyQuickGroups);
+const sendQuickTeamsEl = document.querySelector("#send-quick-teams") || document.querySelector("#copy-quick-groups");
+if (sendQuickTeamsEl) sendQuickTeamsEl.addEventListener("click", sendQuickTeams);
 document.querySelector("#retro-edit-toggle").addEventListener("click", () => {
   if (retroEditingUnlocked) return;
   const panel = document.querySelector("#retro-auth-panel");
@@ -734,11 +705,6 @@ document.querySelector("#close-overview").addEventListener("click", () => {
 document.querySelector("#finish-game").addEventListener("click", () => { document.querySelector("#finish-confirm-panel").hidden = false; });
 document.querySelector("#cancel-finish-game").addEventListener("click", () => { document.querySelector("#finish-confirm-panel").hidden = true; });
 document.querySelector("#confirm-finish-game").addEventListener("click", () => finishQuickGame(`O jogo foi encerrado na rodada ${Math.min(currentRound + 1, quickSchedule.length)}.`));
-document.querySelector("#copy-share-code").addEventListener("click", async () => {
-  try { await navigator.clipboard.writeText(currentShareCode); document.querySelector("#copy-share-code").textContent = "Código copiado"; }
-  catch { document.querySelector("#copy-share-code").textContent = currentShareCode; }
-  window.setTimeout(() => { document.querySelector("#copy-share-code").textContent = "Copiar código"; }, 1800);
-});
 document.querySelector("#copy-share-link").addEventListener("click", async () => {
   const link = new URL(`acompanhar.html?codigo=${encodeURIComponent(currentShareCode)}`, window.location.href).href;
   try { await navigator.clipboard.writeText(link); document.querySelector("#copy-share-link").textContent = "Link copiado"; }

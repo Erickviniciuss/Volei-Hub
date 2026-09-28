@@ -33,25 +33,42 @@ function maxPointRounds(total) { return total % 2 === 0 ? total - 1 : total; }
 function normalizePointRounds(value, total, unlimited) { const max = maxPointRounds(total); const requested = Math.max(1, Number(value) || 1); return unlimited ? requested : Math.max(max, Math.round(requested / max) * max); }
 function pointKey(round, match) { return `${round}-${match}`; }
 function generatePointShareCode() { const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; const values = crypto.getRandomValues(new Uint8Array(8)); return `VH-${[...values].map((value) => alphabet[value % alphabet.length]).join("")}`; }
-async function copyPointGroups() {
+async function sendPointTeams() {
   const teams = pointTeams.length ? pointTeams : [...document.querySelectorAll(".point-team-name")].map((input, index) => input.value.trim() || `Equipe ${index + 1}`);
   const roster = pointRoster.length ? pointRoster : teams.map((_, teamIndex) => [...document.querySelectorAll(`.point-player-name[data-team="${teamIndex}"]`)].map((input) => input.value.trim()).filter(Boolean));
   const gameDate = pointStartedAt ? new Date(pointStartedAt).toLocaleString("pt-BR") : new Date().toLocaleString("pt-BR");
-  const text = `VÔLEI HUB · GRUPOS\n\n${teams.map((team, index) => {
-    const players = roster[index]?.length ? roster[index] : ["Vazio"];
-    return `${team}\n${players.map((person) => `• ${person}`).join("\n")}`;
-  }).join("\n\n")}\n\nData do jogo: ${gameDate}`;
-  const button = document.querySelector("#copy-point-groups");
-  try {
-    await navigator.clipboard.writeText(text);
-    button.textContent = "Grupos copiados";
-  } catch {
-    const area = document.createElement("textarea"); area.value = text; area.style.position = "fixed"; area.style.opacity = "0";
-    document.body.append(area); area.select(); document.execCommand("copy"); area.remove();
-    button.textContent = "Grupos copiados";
+
+  const formattedText = `🏐 *VÔLEI HUB · EQUIPES E INTEGRANTES* 🏐\n📅 ${gameDate}\n\n${teams.map((team, index) => {
+    const players = roster[index]?.length ? roster[index] : ["Participantes não informados"];
+    return `*${team}*\n${players.map((person) => `• ${person}`).join("\n")}`;
+  }).join("\n\n")}`;
+
+  let file = null;
+  const pdfOptions = {
+    title: "Equipes e Integrantes",
+    subtitle: `Modalidade: Jogo Ponto a Ponto • Data: ${gameDate}`,
+    teams: teams,
+    players: roster,
+    teamsOnly: true,
+    date: pointStartedAt || new Date()
+  };
+  if (window.buildVolleyPdf) {
+    const res = window.buildVolleyPdf(pdfOptions);
+    file = res?.file;
   }
-  window.setTimeout(() => { button.textContent = "Copiar grupos"; }, 1800);
+
+  if (window.openPdfShareModal) {
+    window.openPdfShareModal({
+      file,
+      pdfOptions,
+      title: "Equipes e Integrantes - Vôlei Hub",
+      text: formattedText,
+      whatsappText: formattedText
+    });
+    return;
+  }
 }
+const copyPointGroups = sendPointTeams;
 function savePointGame() {
   if (!pointSchedule.length || !pointShareCode) return;
   const game = { status: "active", started: true, gameType: "points", tieBreakMode: pointTieBreakMode, shareCode: pointShareCode, startedAt: pointStartedAt, schedule: pointSchedule, currentRound: pointRound, pointMatch, scores: [...pointScores.entries()], pointHistory: [...pointHistory.entries()], teams: pointTeams, playerCount: pointCurrentPlayerCount, players: pointRoster, allowNoNames: pointRequireNames.checked };
@@ -134,7 +151,7 @@ function buildPointExpandedSchedule(previousRound, previousTeams, nextTeams, fut
 function makePointInputs() {
   const previousTeams = [...document.querySelectorAll(".point-team-name")].map((input) => input.value);
   const total = Number(pointTeamCount.value);
-  pointRoundCount.value = normalizePointRounds(pointRoundCount.value, total, pointUnlimited.checked);
+  pointRoundCount.value = normalizePointRounds(Number(pointRoundCount.value) || 10, total, pointUnlimited.checked);
   pointTeamNames.innerHTML = Array.from({ length: total }, (_, index) => `<label class="name-field">TIME ${index + 1}<input class="point-team-name" type="text" maxlength="28" value="${escapePoint(previousTeams[index] || `Equipe ${index + 1}`)}" /></label>`).join("");
   makePointPlayerInputs();
 }
@@ -430,39 +447,44 @@ function pointPdfFileName(date = new Date()) {
 }
 async function printPointGamePdf() {
   if (!pointSchedule.length) return;
-  const shareTitle = "Tabelas do Jogo Ponto a Ponto - Vôlei Hub";
-  const whatsappMsg = `🏐 *VÔLEI HUB - JOGO PONTO A PONTO* 🏐\n📅 ${new Date().toLocaleDateString("pt-BR")}\nTabelas e confrontos da partida.\n\n📎 O PDF completo foi baixado no dispositivo para envio!`;
+  const shareTitle = "Rodadas da Partida - Vôlei Hub";
+  const gameDate = pointStartedAt ? new Date(pointStartedAt) : new Date();
+  const fullRoundsText = window.formatVolleyRoundsText
+    ? window.formatVolleyRoundsText({
+        schedule: pointSchedule,
+        scores: pointScores,
+        title: "Rodadas da Partida",
+        subtitle: "Modalidade: Jogo Ponto a Ponto",
+        date: gameDate
+      })
+    : `🏐 *VÔLEI HUB - RODADAS DA PARTIDA* 🏐\n📅 ${new Date().toLocaleDateString("pt-BR")}`;
+  
   let file = null;
-  const Pdf = window.jspdf?.jsPDF;
-  if (Pdf) {
-    try {
-      const pdf = new Pdf({ unit: "mm", format: "a4" }); let y = 18;
-      const line = (text, size = 10, bold = false) => { pdf.setFont("helvetica", bold ? "bold" : "normal"); pdf.setFontSize(size); const lines = pdf.splitTextToSize(text, 175); if (y + lines.length * 6 > 280) { pdf.addPage(); y = 18; } pdf.text(lines, 18, y); y += lines.length * 6; };
-      line("VÔLEI HUB", 12, true); line("Tabelas do Jogo Ponto a Ponto", 20, true);
-      pointSchedule.forEach((round, roundIndex) => { line(`Rodada ${roundIndex + 1}`, 13, true); round.matches.forEach(([home, away], matchIndex) => { const score = pointScores.get(pointKey(roundIndex, matchIndex)); line(`${home}    ${score ? `${score.home} × ${score.away}` : "×"}    ${away}`); }); if (round.bye) line(`Folga: ${round.bye}`, 9); y += 3; });
-      const fileName = pointPdfFileName();
-      try {
-        file = new File([pdf.output("blob")], fileName, { type: "application/pdf" });
-      } catch (_) {
-        file = pdf.output("blob");
-        if (file) file.name = fileName;
-      }
-    } catch (e) {
-      console.warn("Erro ao compilar PDF:", e);
-    }
+  const pdfOptions = {
+    title: "Rodadas da Partida",
+    subtitle: `Modalidade: Jogo Ponto a Ponto • ${new Date().toLocaleDateString("pt-BR")}`,
+    schedule: pointSchedule,
+    scores: pointScores,
+    onlyPlayed: false,
+    date: gameDate
+  };
+  if (window.buildVolleyPdf) {
+    const res = window.buildVolleyPdf(pdfOptions);
+    file = res?.file;
   }
 
   if (window.openPdfShareModal) {
     window.openPdfShareModal({
       file,
+      pdfOptions,
       title: shareTitle,
-      text: "Tabelas de jogos do Vôlei Hub.",
-      whatsappText: whatsappMsg
+      text: fullRoundsText,
+      whatsappText: fullRoundsText
     });
     return;
   }
 
-  const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(whatsappMsg)}`;
+  const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(fullRoundsText)}`;
   window.open(waUrl, "_blank");
 }
 
@@ -591,71 +613,31 @@ async function printFinishedPointResult() {
   const whatsappMsg = `🏆 *VÔLEI HUB - RESULTADO (PONTO A PONTO)* 🏆\n${result.reason || "Partida finalizada"}${rankingText}\n\n📎 O relatório completo em PDF foi baixado no dispositivo para envio!`;
 
   let file = null;
-  const Pdf = window.jspdf?.jsPDF;
-  if (Pdf) {
-    try {
-      const scores = new Map(result.scores || []);
-      const playedRounds = (result.schedule || []).map((round, index) => ({ round, index })).filter(({ round, index }) => round.matches.some((_, gameIndex) => {
-        const score = scores.get(pointKey(index, gameIndex));
-        return Array.isArray(score) && score[0] !== "" && score[1] !== "" && score[0] != null && score[1] != null;
-      }));
-      const showPointsBalance = result.showPointsBalance !== false;
-      const pdf = new Pdf({ unit: "mm", format: "a4" }); let y = 18;
-      const line = (text, size = 10, bold = false) => {
-        pdf.setFont("helvetica", bold ? "bold" : "normal"); pdf.setFontSize(size); pdf.setTextColor(30, 41, 59);
-        const lines = pdf.splitTextToSize(String(text), 175);
-        if (y + lines.length * 6 > 280) { pdf.addPage(); y = 18; }
-        pdf.text(lines, 18, y); y += lines.length * 6;
-      };
-      const columns = showPointsBalance ? [10, 62, 18, 18, 18, 24, 24] : [10, 78, 22, 22, 22];
-      const headers = showPointsBalance ? ["#", "Equipe", "Jogos", "Vit.", "Der.", "Pontos", "Saldo"] : ["#", "Equipe", "Jogos", "Vit.", "Der."];
-      const tableRow = (cells, header = false) => {
-        if (y + 8 > 280) { pdf.addPage(); y = 18; }
-        let x = 18;
-        cells.forEach((cell, index) => {
-          pdf.setDrawColor(190, 200, 210); pdf.setFillColor(header ? 30 : 255, header ? 41 : 255, header ? 59 : 255);
-          pdf.rect(x, y, columns[index], 8, "FD"); pdf.setTextColor(header ? 255 : 30, header ? 255 : 41, header ? 255 : 59);
-          pdf.setFont("helvetica", header ? "bold" : "normal"); pdf.setFontSize(8);
-          const text = pdf.splitTextToSize(String(cell), columns[index] - 3)[0] || "";
-          pdf.text(text, index === 1 ? x + 1.5 : x + columns[index] / 2, y + 5.2, { align: index === 1 ? "left" : "center" }); x += columns[index];
-        }); y += 8;
-      };
-      line("VÔLEI HUB", 12, true); line("Resultado de partida", 20, true); line(result.reason); y += 3;
-      line("Classificação final", 15, true); tableRow(headers, true);
-      result.standings.forEach((team, index) => tableRow(showPointsBalance ? [`${index + 1}º`, team.name, team.games, team.wins, team.losses, team.points, `${team.difference >= 0 ? "+" : ""}${team.difference}`] : [`${index + 1}º`, team.name, team.games, team.wins, team.losses]));
-      if (result.exclusionAlert) {
-        y += 2;
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(8.5);
-        pdf.setTextColor(180, 83, 9);
-        const alertLines = pdf.splitTextToSize(result.exclusionAlert, 175);
-        if (y + alertLines.length * 4.5 > 280) { pdf.addPage(); y = 18; }
-        pdf.text(alertLines, 18, y);
-        y += alertLines.length * 4.5 + 2;
-      }
-      const players = result.playerStandings || [];
-      if (players.length) { y += 8; line("Top 10 jogadores", 15, true); players.slice(0, 10).forEach((player, index) => line(`${index + 1}º ${player.name} · ${player.team} · ${player.points} pontos`)); }
-      y += 8; line("Jogos por rodada", 15, true);
-      playedRounds.forEach(({ round, index }) => {
-        line(`Rodada ${index + 1}`, 13, true);
-        round.matches.forEach(([home, away], gameIndex) => { const score = scores.get(pointKey(index, gameIndex)); if (score?.[0] !== "" && score?.[1] !== "" && score?.[0] != null && score?.[1] != null) line(`${home}    ${score[0]} × ${score[1]}    ${away}`); });
-        if (round.bye) line(`Folga: ${round.bye}`, 9); y += 3;
-      });
-      const filename = pointPdfFileName(result.startedAt || result.finishedAt);
-      try {
-        file = new File([pdf.output("blob")], filename, { type: "application/pdf" });
-      } catch (_) {
-        file = pdf.output("blob");
-        if (file) file.name = filename;
-      }
-    } catch (e) {
-      console.warn("Erro ao compilar PDF:", e);
-    }
+  let pdfOptions = null;
+  if (window.buildVolleyPdf) {
+    const scores = new Map(result.scores || []);
+    pdfOptions = {
+      title: "Resultado de partida",
+      subtitle: result.reason || "Partida finalizada",
+      standings: result.standings,
+      showPointsBalance: result.showPointsBalance !== false,
+      exclusionAlert: result.exclusionAlert,
+      topPlayers: result.playerStandings,
+      teams: result.teams || result.standings?.map((s) => s.name),
+      players: result.players,
+      schedule: result.schedule,
+      scores: scores,
+      onlyPlayed: true,
+      date: result.startedAt || result.finishedAt
+    };
+    const res = window.buildVolleyPdf(pdfOptions);
+    file = res?.file;
   }
 
   if (window.openPdfShareModal) {
     window.openPdfShareModal({
       file,
+      pdfOptions,
       title: shareTitle,
       text: "Resultado da partida.",
       whatsappText: whatsappMsg
@@ -737,7 +719,8 @@ document.querySelector("#point-scorer-dialog").addEventListener("cancel", () => 
 document.querySelector("#point-show-rounds").addEventListener("click", () => { document.querySelector("#point-live-settings").hidden = true; document.querySelector("#point-adjust-game").setAttribute("aria-expanded", "false"); if (!pointRetroEditingUnlocked) document.querySelector("#point-history-editor").hidden = true; renderPointOverview(); document.querySelector("#point-overview").hidden = false; window.requestAnimationFrame(() => (document.querySelector("#point-overview-rounds .is-current") || document.querySelector("#point-overview")).scrollIntoView({ behavior: "smooth", block: "start" })); });
 document.querySelector("#point-print-game").addEventListener("click", printPointGamePdf);
 document.querySelector("#point-finished-print-game").addEventListener("click", printFinishedPointResult);
-document.querySelector("#copy-point-groups").addEventListener("click", copyPointGroups);
+const sendPointTeamsEl = document.querySelector("#send-point-teams") || document.querySelector("#copy-point-groups");
+if (sendPointTeamsEl) sendPointTeamsEl.addEventListener("click", sendPointTeams);
 document.querySelector("#point-adjust-game").addEventListener("click", openLivePointSettings);
 document.querySelector("#point-live-team-count").addEventListener("change", makeLivePointTeamInputs);
 document.querySelector("#point-live-player-count").addEventListener("change", makeLivePointPlayerInputs);
@@ -779,7 +762,6 @@ document.querySelector("#point-overview-rounds").addEventListener("click", (even
 document.querySelector("#point-finish").addEventListener("click", () => { document.querySelector("#point-finish-confirm").hidden = false; });
 document.querySelector("#point-cancel-finish").addEventListener("click", () => { document.querySelector("#point-finish-confirm").hidden = true; });
 document.querySelector("#point-confirm-finish").addEventListener("click", () => { document.querySelector("#point-finish-confirm").hidden = true; finishPointGame(`O jogo foi encerrado na rodada ${Math.min(pointRound + 1, pointSchedule.length)}.`); });
-document.querySelector("#point-copy-share-code").addEventListener("click", async () => { try { await navigator.clipboard.writeText(pointShareCode); document.querySelector("#point-copy-share-code").textContent = "Código copiado"; } catch { document.querySelector("#point-copy-share-code").textContent = pointShareCode; } window.setTimeout(() => { document.querySelector("#point-copy-share-code").textContent = "Copiar código"; }, 1800); });
 document.querySelector("#point-copy-share-link").addEventListener("click", async () => {
   const link = new URL(`acompanhar.html?codigo=${encodeURIComponent(pointShareCode)}`, window.location.href).href;
   try { await navigator.clipboard.writeText(link); document.querySelector("#point-copy-share-link").textContent = "Link copiado"; }
