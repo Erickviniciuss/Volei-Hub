@@ -719,6 +719,14 @@ document.querySelector("#point-scorer-dialog").addEventListener("cancel", () => 
 document.querySelector("#point-show-rounds").addEventListener("click", () => { document.querySelector("#point-live-settings").hidden = true; document.querySelector("#point-adjust-game").setAttribute("aria-expanded", "false"); if (!pointRetroEditingUnlocked) document.querySelector("#point-history-editor").hidden = true; renderPointOverview(); document.querySelector("#point-overview").hidden = false; window.requestAnimationFrame(() => (document.querySelector("#point-overview-rounds .is-current") || document.querySelector("#point-overview")).scrollIntoView({ behavior: "smooth", block: "start" })); });
 document.querySelector("#point-print-game").addEventListener("click", printPointGamePdf);
 document.querySelector("#point-finished-print-game").addEventListener("click", printFinishedPointResult);
+const pointFinishedExportBtn = document.querySelector("#point-finished-export-game");
+if (pointFinishedExportBtn) {
+  pointFinishedExportBtn.addEventListener("click", () => {
+    if (finishedPointResult && window.exportGameAsJson) {
+      window.exportGameAsJson(finishedPointResult, pointFinishedExportBtn);
+    }
+  });
+}
 const sendPointTeamsEl = document.querySelector("#send-point-teams") || document.querySelector("#copy-point-groups");
 if (sendPointTeamsEl) sendPointTeamsEl.addEventListener("click", sendPointTeams);
 document.querySelector("#point-adjust-game").addEventListener("click", openLivePointSettings);

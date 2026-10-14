@@ -90,7 +90,7 @@ function renderResultsLegacy() {
     const topPlayer = resultGameType(result) === "points" ? pointPlayerRanking(result)[0] : null;
     const playerHighlight = topPlayer ? `<p class="result-top-player">Maior pontuador: <strong>${escapeResult(topPlayer.name)}</strong> · ${escapeResult(topPlayer.team)} · ${topPlayer.points} pontos</p>` : resultGameType(result) === "points" ? "<p class=\"result-top-player\">Nenhum ponto individual foi registrado.</p>" : "";
     const bestWins = Math.max(...result.standings.map((team) => team.wins));
-    return `<article class="result-card"><div class="result-card-heading"><div><p class="eyebrow">${date}</p><span class="result-game-type ${resultGameType(result)}">${resultGameTypeLabel(result)}</span><h2>${escapeResult(result.reason)}</h2></div><div class="result-actions"><button class="print-result" type="button" data-id="${result.id}">Enviar PDF</button><button class="delete-result" type="button" data-id="${result.id}">Excluir</button></div></div><div class="result-ranking">${result.standings.map((team, index) => `<div><strong>${index + 1}º</strong>${team.wins > 0 && team.wins === bestWins ? '<span class="leader-crown" title="Líder">♛</span>' : ""}<span class="result-team-name">${escapeResult(team.name)}</span>${resultStats(team, result)}</div>`).join("")}</div>${playerHighlight}</article>`;
+    return `<article class="result-card"><div class="result-card-heading"><div><p class="eyebrow">${date}</p><span class="result-game-type ${resultGameType(result)}">${resultGameTypeLabel(result)}</span><h2>${escapeResult(result.reason)}</h2></div><div class="result-actions"><button class="export-result" type="button" data-id="${result.id}" title="Exportar jogo (JSON)" aria-label="Exportar jogo em formato JSON"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button><button class="print-result" type="button" data-id="${result.id}">Enviar PDF</button><button class="delete-result" type="button" data-id="${result.id}">Excluir</button></div></div><div class="result-ranking">${result.standings.map((team, index) => `<div><strong>${index + 1}º</strong>${team.wins > 0 && team.wins === bestWins ? '<span class="leader-crown" title="Líder">♛</span>' : ""}<span class="result-team-name">${escapeResult(team.name)}</span>${resultStats(team, result)}</div>`).join("")}</div>${playerHighlight}</article>`;
   }).join("") + (visible.length < results.length ? `<button id="show-more-results" class="show-more-results" type="button">Mostrar mais</button>` : "");
 }
 
@@ -116,7 +116,7 @@ function renderResults() {
     const topPlayer = resultGameType(result) === "points" ? pointPlayerRanking(result)[0] : null;
     const playerHighlight = topPlayer ? `<p class="result-top-player">Maior pontuador: <strong>${escapeResult(topPlayer.name)}</strong> · ${escapeResult(topPlayer.team)} · ${topPlayer.points} pontos</p>` : resultGameType(result) === "points" ? '<p class="result-top-player">Nenhum ponto individual foi registrado.</p>' : "";
     const alertHtml = result.exclusionAlert ? `<div class="exclusion-alert-box">${escapeResult(result.exclusionAlert)}</div>` : "";
-    return `<article class="result-card"><div class="result-card-heading"><div><p class="eyebrow">${date}</p><span class="result-game-type ${resultGameType(result)}">${resultGameTypeLabel(result)}</span><h2>${escapeResult(result.reason)}</h2></div><div class="result-actions"><button class="print-result" type="button" data-id="${result.id}">Enviar PDF</button><button class="delete-result" type="button" data-id="${result.id}">Excluir</button></div></div>${alertHtml}<div class="result-ranking">${result.standings.map((team, index) => `<div><strong>${index + 1}º</strong>${resultLeader(team, result) ? '<span class="leader-crown" title="Líder">♛</span>' : ""}<span class="result-team-name">${escapeResult(team.name)}</span>${resultStats(team, result)}</div>`).join("")}</div>${playerHighlight}</article>`;
+    return `<article class="result-card"><div class="result-card-heading"><div><p class="eyebrow">${date}</p><span class="result-game-type ${resultGameType(result)}">${resultGameTypeLabel(result)}</span><h2>${escapeResult(result.reason)}</h2></div><div class="result-actions"><button class="export-result" type="button" data-id="${result.id}" title="Exportar jogo (JSON)" aria-label="Exportar jogo em formato JSON"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button><button class="print-result" type="button" data-id="${result.id}">Enviar PDF</button><button class="delete-result" type="button" data-id="${result.id}">Excluir</button></div></div>${alertHtml}<div class="result-ranking">${result.standings.map((team, index) => `<div><strong>${index + 1}º</strong>${resultLeader(team, result) ? '<span class="leader-crown" title="Líder">♛</span>' : ""}<span class="result-team-name">${escapeResult(team.name)}</span>${resultStats(team, result)}</div>`).join("")}</div>${playerHighlight}</article>`;
   }).join("") + (hasMoreCloudResults ? '<button id="show-more-results" class="show-more-results" type="button">Carregar mais</button>' : "");
 }
 
@@ -201,13 +201,22 @@ function getGameStore() {
 resultsList.addEventListener("click", async (event) => {
   if (event.target.closest("#show-more-results")) { await loadMoreResults(); return; }
   const button = event.target.closest("button[data-id]"); if (!button) return;
-  const id = Number(button.dataset.id); const result = displayedResults.find((item) => item.id === id); if (!result) return;
+  const id = button.dataset.id;
+  const result = displayedResults.find((item) => String(item.id) === String(id)) || allResults.find((item) => String(item.id) === String(id));
+  if (!result) return;
   const store = getGameStore();
   if (button.classList.contains("delete-result") && window.confirm("Excluir este histórico de jogo?")) {
-    store.deleteResult(id);
-    await store.deleteResultFromCloud(id);
+    const numId = Number(id) || id;
+    store.deleteResult(numId);
+    await store.deleteResultFromCloud(numId);
     await loadResults();
-  } else if (button.classList.contains("print-result")) printResult(result);
+  } else if (button.classList.contains("print-result")) {
+    printResult(result);
+  } else if (button.classList.contains("export-result")) {
+    if (window.exportGameAsJson) {
+      window.exportGameAsJson(result, button);
+    }
+  }
 });
 
 async function loadMoreResults() {

@@ -683,6 +683,14 @@ document.querySelector("#apply-live-settings").addEventListener("click", applyLi
 document.querySelector("#show-rounds").addEventListener("click", () => { document.querySelector("#live-settings").hidden = true; document.querySelector("#adjust-game-toggle").setAttribute("aria-expanded", "false"); renderOverview(); overview.hidden = false; window.requestAnimationFrame(() => (overviewRounds.querySelector(".is-current") || overview).scrollIntoView({ behavior: "smooth", block: "start" })); });
 document.querySelector("#print-game").addEventListener("click", printQuickGamePdf);
 document.querySelector("#finished-print-game").addEventListener("click", printFinishedQuickResult);
+const finishedExportBtn = document.querySelector("#finished-export-game");
+if (finishedExportBtn) {
+  finishedExportBtn.addEventListener("click", () => {
+    if (finishedQuickResult && window.exportGameAsJson) {
+      window.exportGameAsJson(finishedQuickResult, finishedExportBtn);
+    }
+  });
+}
 const sendQuickTeamsEl = document.querySelector("#send-quick-teams") || document.querySelector("#copy-quick-groups");
 if (sendQuickTeamsEl) sendQuickTeamsEl.addEventListener("click", sendQuickTeams);
 document.querySelector("#retro-edit-toggle").addEventListener("click", () => {

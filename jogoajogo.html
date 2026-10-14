@@ -40,7 +40,7 @@
           <button id="point-apply-live-settings" type="button">Aplicar às próximas rodadas</button>
         </section>
       </section>
-      <section id="point-finished" class="quick-finished" hidden><p class="eyebrow">JOGO ENCERRADO</p><h2>Partida finalizada</h2><p id="point-finished-copy"></p><div id="point-finished-ranking" class="finished-ranking"></div><div id="point-player-ranking" class="finished-ranking"></div><button id="point-finished-print-game" class="secondary-button" type="button">Enviar PDF</button><button id="point-finished-history-toggle" class="secondary-button" type="button" aria-expanded="false">Ver histórico de movimentos</button><section id="point-finished-history" class="point-game-history" hidden></section><button id="point-new-game" type="button">Criar novo jogo</button></section>
+      <section id="point-finished" class="quick-finished" hidden><p class="eyebrow">JOGO ENCERRADO</p><h2>Partida finalizada</h2><p id="point-finished-copy"></p><div id="point-finished-ranking" class="finished-ranking"></div><div id="point-player-ranking" class="finished-ranking"></div><button id="point-finished-print-game" class="secondary-button" type="button">Enviar PDF</button><button id="point-finished-export-game" class="secondary-button" type="button">Exportar JSON</button><button id="point-finished-history-toggle" class="secondary-button" type="button" aria-expanded="false">Ver histórico de movimentos</button><section id="point-finished-history" class="point-game-history" hidden></section><button id="point-new-game" type="button">Criar novo jogo</button></section>
       <dialog id="point-scorer-dialog" class="account-dialog point-scorer-dialog">
         <div class="point-scorer-dialog-content">
           <div class="dialog-heading"><div><p class="eyebrow">REGISTRAR PONTO</p><h2 id="point-scorer-title">Quem marcou?</h2></div><button id="point-scorer-close" class="dialog-close" type="button" aria-label="Fechar">×</button></div>
@@ -58,10 +58,11 @@
     <script src="theme.js"></script>
     <script src="table-auth.js"></script>
     <script src="game-storage.js?v=5"></script>
+    <script src="game-export.js?v=1"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="qrious.min.js"></script>
     <script src="qr-modal.js?v=3"></script>
     <script src="pdf-share.js?v=16"></script>
-    <script src="jogo-ponto.js?v=41"></script>
+    <script src="jogo-ponto.js?v=42"></script>
   </body>
 </html>
