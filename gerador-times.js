@@ -382,51 +382,182 @@ peopleNames.addEventListener("click", (event) => {
   }
 });
 
+function openPasteSection() {
+  const section = document.querySelector("#paste-names-section");
+  if (section) {
+    section.hidden = false;
+    updatePasteCounter();
+    setTimeout(() => {
+      document.querySelector("#paste-names-input")?.focus();
+      section.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }, 50);
+  }
+}
+
+function closePasteSection() {
+  const section = document.querySelector("#paste-names-section");
+  if (section) {
+    section.hidden = true;
+  }
+}
+
 function parseTxtContent(text) {
-  const rawLines = text.split(/\r?\n/);
+  if (!text || typeof text !== "string") return { names: [], declaredCount: null };
+  const rawLines = text.split(/[\r\n]+/);
+  const lines = rawLines.map((l) => l.trim()).filter(Boolean);
+  if (!lines.length) return { names: [], declaredCount: null };
+
+  let declaredCount = null;
+  let startIndex = 0;
+
+  // Verifica se a primeira linha contém a quantidade de participantes (ex.: "17")
+  const firstLine = lines[0].replace(/^#+/g, "").trim();
+  const firstLineMatch = firstLine.match(/^(\d+)$/);
+  if (firstLineMatch) {
+    declaredCount = parseInt(firstLineMatch[1], 10);
+    startIndex = 1;
+  }
+
   const names = [];
-  rawLines.forEach((line) => {
-    let cleaned = line.trim();
-    if (!cleaned) return;
-    cleaned = cleaned.replace(/^[\d\s.\-•)*]+/g, "").trim();
-    if (cleaned) names.push(cleaned);
+  for (let i = startIndex; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.includes(",") || line.includes(";")) {
+      const parts = line.split(/[,;]+/);
+      parts.forEach((part) => {
+        let pClean = part.replace(/^[\d\s.\-•)*]+/g, "").trim();
+        if (pClean && !/^\d+$/.test(pClean)) names.push(pClean);
+      });
+    } else {
+      let pClean = line.replace(/^[\d\s.\-•)*]+/g, "").trim();
+      if (pClean && !/^\d+$/.test(pClean)) names.push(pClean);
+    }
+  }
+
+  return { names, declaredCount };
+}
+
+function updatePasteCounter() {
+  const input = document.querySelector("#paste-names-input");
+  const countEl = document.querySelector("#paste-names-count");
+  if (!input || !countEl) return;
+  const { names, declaredCount } = parseTxtContent(input.value);
+  if (!input.value.trim() || names.length === 0) {
+    countEl.textContent = "";
+    countEl.hidden = true;
+  } else {
+    const label = names.length === 1 ? "participante detectado" : "participantes detectados";
+    countEl.textContent = declaredCount && declaredCount !== names.length
+      ? `${names.length}/${declaredCount} ${label}`
+      : `${names.length} ${label}`;
+    countEl.hidden = false;
+  }
+}
+
+function applyPastedNames(textParam) {
+  const input = document.querySelector("#paste-names-input");
+  const rawText = (typeof textParam === "string" ? textParam : input?.value) || "";
+  const { names, declaredCount } = parseTxtContent(rawText);
+
+  if (!names.length) {
+    generatorMessage.textContent = "Cole ou digite pelo menos um nome válido na caixa de texto.";
+    generatorMessage.className = "auth-message is-error";
+    openPasteSection();
+    input?.focus();
+    return;
+  }
+
+  // Preenche a lista com os novos participantes colados
+  participantDraft = names.map((name) => ({ name, seedLevel: 0, stars: 3 }));
+  peopleCount.value = participantDraft.length;
+
+  // Ajusta automaticamente a quantidade de times necessários se for maior que a atual
+  const perTeam = Math.max(1, Number(peoplePerTeam.value) || 4);
+  const requiredTeams = Math.ceil(participantDraft.length / perTeam);
+  if (requiredTeams > Number(teamTotal.value)) {
+    teamTotal.value = Math.min(7, requiredTeams);
+  }
+
+  // Renderiza os participantes na tela
+  renderPeopleInputs(false);
+
+  // Garante que o valor de cada input no DOM seja preenchido explicitamente
+  const createdInputs = document.querySelectorAll("#people-names .generator-person");
+  participantDraft.forEach((p, i) => {
+    if (createdInputs[i]) {
+      createdInputs[i].value = p.name || "";
+    }
   });
-  return names;
+
+  // Oculta novamente o campo de colagem conforme solicitado pelo usuário
+  closePasteSection();
+
+  const countMessage = declaredCount && declaredCount !== names.length
+    ? `${names.length} de ${declaredCount} participantes carregados com sucesso!`
+    : `${names.length} ${names.length === 1 ? "participante carregado" : "participantes carregados"} com sucesso!`;
+
+  generatorMessage.textContent = countMessage;
+  generatorMessage.className = "auth-message is-success";
+
+  // Rola suavemente até os nomes
+  document.querySelector("#people-names")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
-function handleTxtImport(event) {
-  const file = event.target.files?.[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    const text = e.target.result || "";
-    const names = parseTxtContent(text);
-    if (!names.length) {
-      generatorMessage.textContent = "Nenhum nome válido encontrado no arquivo TXT.";
-      generatorMessage.className = "auth-message is-error";
-      return;
+async function handlePasteButtonClick() {
+  const section = document.querySelector("#paste-names-section");
+  const input = document.querySelector("#paste-names-input");
+
+  // Se o painel já estiver aberto e já contiver texto, carrega imediatamente
+  if (section && !section.hidden && input && input.value.trim()) {
+    applyPastedNames();
+    return;
+  }
+
+  // 1. Tenta ler diretamente da área de transferência (clipboard) do sistema
+  if (navigator.clipboard && typeof navigator.clipboard.readText === "function") {
+    try {
+      const clipboardText = await navigator.clipboard.readText();
+      if (clipboardText && clipboardText.trim()) {
+        const { names } = parseTxtContent(clipboardText);
+        if (names.length > 0) {
+          if (input) input.value = clipboardText;
+          applyPastedNames(clipboardText);
+          return;
+        }
+      }
+    } catch (err) {
+      console.log("[Gerador] Leitura direta do clipboard indisponível pelo navegador, abrindo painel:", err);
     }
-    saveParticipantDraftFromInputs();
-    participantDraft = names.map((name) => ({ name, seedLevel: 0, stars: 3 }));
-    const perTeam = Math.max(1, Number(peoplePerTeam.value) || 4);
-    const requiredTeams = Math.ceil(names.length / perTeam);
-    if (requiredTeams > Number(teamTotal.value)) {
-      teamTotal.value = Math.min(7, requiredTeams);
-    }
-    renderPeopleInputs(false);
-    generatorMessage.textContent = `${names.length} ${names.length === 1 ? "participante importado" : "participantes importados"} do arquivo TXT com sucesso!`;
-    generatorMessage.className = "auth-message is-success";
-    event.target.value = "";
-  };
-  reader.readAsText(file);
+  }
+
+  // 2. Se não conseguiu ler diretamente (ou permissão negada ou clipboard vazio), abre o painel para o usuário colar
+  if (section && !section.hidden) {
+    closePasteSection();
+  } else {
+    openPasteSection();
+  }
 }
 
-const importTxtBtn = document.querySelector("#import-txt-btn");
-const importTxtFile = document.querySelector("#import-txt-file");
-if (importTxtBtn && importTxtFile) {
-  importTxtBtn.addEventListener("click", () => importTxtFile.click());
-  importTxtFile.addEventListener("change", handleTxtImport);
-}
+window.applyPastedNames = applyPastedNames;
+window.openPasteSection = openPasteSection;
+window.closePasteSection = closePasteSection;
+window.handlePasteButtonClick = handlePasteButtonClick;
+
+document.querySelector("#paste-names-input")?.addEventListener("input", updatePasteCounter);
+document.querySelector("#paste-names-input")?.addEventListener("paste", () => {
+  setTimeout(updatePasteCounter, 20);
+});
+document.querySelector("#apply-pasted-names")?.addEventListener("click", () => applyPastedNames());
+document.querySelector("#clear-pasted-names")?.addEventListener("click", () => {
+  const input = document.querySelector("#paste-names-input");
+  if (input) {
+    input.value = "";
+    updatePasteCounter();
+    input.focus();
+  }
+});
+document.querySelector("#cancel-pasted-names")?.addEventListener("click", closePasteSection);
+document.querySelector("#close-paste-section")?.addEventListener("click", closePasteSection);
+document.querySelector("#open-paste-btn-bottom")?.addEventListener("click", handlePasteButtonClick);
 
 document.querySelector("#draw-teams").addEventListener("click", drawTeams);
 document.querySelector("#add-generator-person").addEventListener("click", addGeneratorPerson);

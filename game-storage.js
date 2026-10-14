@@ -33,15 +33,41 @@ window.quickGameStore = {
       game_data: result,
     }, { onConflict: "user_id,local_id" });
   },
-  async getCloudResults(page = 0, limit = 5) {
+  async getCloudResults(page = 0, limit = 5, filters = {}) {
     if (!cloudSupabase) return { data: [], hasMore: false, error: new Error("Supabase não configurado") };
     const from = page * limit;
     const to = from + limit - 1;
-    const { data, count, error } = await cloudSupabase
+
+    let query = cloudSupabase
       .from("game_results")
-      .select("game_data", { count: "exact" })
+      .select("game_data", { count: "exact" });
+
+    // Filtro por data (dia completo de acordo com o fuso horário local)
+    if (filters?.date) {
+      const [year, month, day] = String(filters.date).split("-").map(Number);
+      if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+        const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0);
+        const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999);
+        query = query
+          .gte("finished_at", startOfDay.toISOString())
+          .lte("finished_at", endOfDay.toISOString());
+      }
+    }
+
+    // Filtro por modalidade/tipo de jogo
+    if (filters?.type && filters.type !== "all") {
+      if (filters.type === "points") {
+        query = query.eq("game_data->>gameType", "points");
+      } else if (filters.type === "result") {
+        query = query.or("game_data->>gameType.eq.result,game_data->>gameType.is.null");
+      }
+    }
+
+    query = query
       .order("finished_at", { ascending: false })
       .range(from, to);
+
+    const { data, count, error } = await query;
     const items = (data || []).map((row) => row.game_data);
     const totalCount = count ?? 0;
     const hasMore = (from + items.length) < totalCount;

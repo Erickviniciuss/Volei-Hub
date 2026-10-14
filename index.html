@@ -3,8 +3,15 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Menu principal | Vôlei Hub</title>
+  <meta name="theme-color" content="#000a17" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Vôlei Hub" />
+  <link rel="apple-touch-icon" href="assets/favicon.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/favicon.png" />
+  <link rel="manifest" href="manifest.json" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
@@ -12,6 +19,7 @@
     rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
   <link rel="icon" type="image/png" href="assets/favicon.png" />
+  <script src="pwa.js" defer></script>
 </head>
 
 <body class="app-loading" data-theme="dark">
@@ -31,8 +39,13 @@
         <div class="welcome-copy">
           <p>Bem-vindo ao</p>
           <h1>Vôlei <span>Hub</span></h1>
-          <p>Organize campeonatos de forma simples e eficiente.</p><strong class="welcome-note">Escolha uma ação rápida
-            abaixo para começar.</strong>
+          <p>Organize campeonatos de forma simples e eficiente.</p>
+          <strong class="welcome-note">Escolha uma ação rápida abaixo para começar.</strong>
+          <div>
+            <button type="button" class="pwa-install-trigger-btn" onclick="window.openPwaInstallGuide && window.openPwaInstallGuide()">
+              📲 Adicionar à Tela de Início
+            </button>
+          </div>
         </div>
         <div class="volleyball-visual" aria-hidden="true"><i></i><i></i><i></i></div>
       </section>
@@ -66,7 +79,7 @@
         <div id="current-game-info"></div>
       </details>
     </section>
-    <footer class="dashboard-footer"><span>© 2026 RST Cipher • Versão 2.1.0</span></footer>
+    <footer class="dashboard-footer"><span>© 2026 RST Cipher • Versão 2.1.1</span></footer>
   </main>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin="anonymous"></script>
   <script src="supabase-config.js"></script>

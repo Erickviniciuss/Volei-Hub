@@ -11,10 +11,18 @@ function updateFilterClearVisibility() {
   }
 }
 
+function getActiveFilters() {
+  return {
+    date: resultsDateFilter?.value || null,
+    type: resultsTypeFilter?.value || "all"
+  };
+}
+
 let displayedResults = [];
 let allResults = [];
 let currentCloudPage = 0;
 let hasMoreCloudResults = false;
+let hasSyncedLocal = false;
 const PAGE_SIZE = 5;
 
 function escapeResult(value) { return String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#039;", '"': "&quot;" })[char]); }
@@ -74,44 +82,26 @@ function localDate(value) {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
-function renderResultsLegacy() {
-  const selectedDate = resultsDateFilter.value;
-  const selectedType = resultsTypeFilter.value;
-  const results = allResults.filter((result) => (!selectedDate || localDate(result.finishedAt) === selectedDate) && (selectedType === "all" || resultGameType(result) === selectedType));
-  displayedResults = results;
-  if (!results.length) {
-    const message = selectedDate || selectedType !== "all" ? "Nenhum jogo encontrado com os filtros selecionados." : "Os resultados aparecerão aqui quando uma partida for finalizada.";
-    resultsList.innerHTML = `<section class="empty-results"><h2>Nenhum jogo encerrado</h2><p>${message}</p></section>`;
-    return;
-  }
-  const visible = results.slice(0, visibleResults);
-  resultsList.innerHTML = visible.map((result) => {
-    const date = new Date(result.finishedAt).toLocaleString("pt-BR");
-    const topPlayer = resultGameType(result) === "points" ? pointPlayerRanking(result)[0] : null;
-    const playerHighlight = topPlayer ? `<p class="result-top-player">Maior pontuador: <strong>${escapeResult(topPlayer.name)}</strong> · ${escapeResult(topPlayer.team)} · ${topPlayer.points} pontos</p>` : resultGameType(result) === "points" ? "<p class=\"result-top-player\">Nenhum ponto individual foi registrado.</p>" : "";
-    const bestWins = Math.max(...result.standings.map((team) => team.wins));
-    return `<article class="result-card"><div class="result-card-heading"><div><p class="eyebrow">${date}</p><span class="result-game-type ${resultGameType(result)}">${resultGameTypeLabel(result)}</span><h2>${escapeResult(result.reason)}</h2></div><div class="result-actions"><button class="export-result" type="button" data-id="${result.id}" title="Exportar jogo (JSON)" aria-label="Exportar jogo em formato JSON"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button><button class="print-result" type="button" data-id="${result.id}">Enviar PDF</button><button class="delete-result" type="button" data-id="${result.id}">Excluir</button></div></div><div class="result-ranking">${result.standings.map((team, index) => `<div><strong>${index + 1}º</strong>${team.wins > 0 && team.wins === bestWins ? '<span class="leader-crown" title="Líder">♛</span>' : ""}<span class="result-team-name">${escapeResult(team.name)}</span>${resultStats(team, result)}</div>`).join("")}</div>${playerHighlight}</article>`;
-  }).join("") + (visible.length < results.length ? `<button id="show-more-results" class="show-more-results" type="button">Mostrar mais</button>` : "");
-}
-
 function resultLeader(team, result) {
   const leader = result.standings?.[0];
   if (!leader || leader.wins <= 0) return false;
   if (result.tieBreakMode === "wins") return team.wins === leader.wins;
   return team.wins === leader.wins && team.difference === leader.difference && team.points === leader.points;
 }
+
 function renderResults() {
   updateFilterClearVisibility();
-  const selectedDate = resultsDateFilter.value;
-  const selectedType = resultsTypeFilter.value;
-  const results = allResults.filter((result) => (!selectedDate || localDate(result.finishedAt) === selectedDate) && (selectedType === "all" || resultGameType(result) === selectedType));
-  displayedResults = results;
-  if (!results.length) {
-    const message = selectedDate || selectedType !== "all" ? "Nenhum jogo encontrado com os filtros selecionados." : "Os resultados aparecerão aqui quando uma partida for finalizada.";
+  const selectedDate = resultsDateFilter?.value || "";
+  const selectedType = resultsTypeFilter?.value || "all";
+  displayedResults = allResults;
+  if (!allResults.length) {
+    const message = selectedDate || selectedType !== "all"
+      ? "Nenhum jogo encontrado com os filtros selecionados."
+      : "Os resultados aparecerão aqui quando uma partida for finalizada.";
     resultsList.innerHTML = `<section class="empty-results"><h2>Nenhum jogo encerrado</h2><p>${message}</p></section>`;
     return;
   }
-  resultsList.innerHTML = results.map((result) => {
+  resultsList.innerHTML = allResults.map((result) => {
     const date = new Date(result.finishedAt).toLocaleString("pt-BR");
     const topPlayer = resultGameType(result) === "points" ? pointPlayerRanking(result)[0] : null;
     const playerHighlight = topPlayer ? `<p class="result-top-player">Maior pontuador: <strong>${escapeResult(topPlayer.name)}</strong> · ${escapeResult(topPlayer.team)} · ${topPlayer.points} pontos</p>` : resultGameType(result) === "points" ? '<p class="result-top-player">Nenhum ponto individual foi registrado.</p>' : "";
@@ -137,32 +127,33 @@ async function printResult(result) {
   const shareTitle = "Resultado - Vôlei Hub";
   const whatsappMsg = `🏆 *VÔLEI HUB - RESULTADO DE PARTIDA* 🏆\n${result.reason || "Histórico de jogo"}${rankingText}\n\n🏐 Gerado pelo Vôlei Hub`;
 
+  // Processar os standings usando visualStats caso losses ou games precisem ser recalculados
+  const processedStandings = (result.standings || []).map((team) => {
+    const visual = resultVisualStats(result, team);
+    return {
+      ...team,
+      games: visual.games,
+      losses: visual.losses
+    };
+  });
+
+  const pdfOptions = {
+    title: "Resultado de partida",
+    subtitle: result.reason || "Histórico de partida",
+    standings: processedStandings,
+    showPointsBalance: showPointsBalance,
+    exclusionAlert: result.exclusionAlert,
+    topPlayers: topPlayers,
+    teams: teamNames,
+    players: result.players,
+    schedule: result.schedule,
+    scores: result.scores,
+    onlyPlayed: true,
+    date: result.startedAt || result.finishedAt
+  };
+
   let file = null;
   if (window.buildVolleyPdf) {
-    // Processar os standings usando visualStats caso losses ou games precisem ser recalculados
-    const processedStandings = (result.standings || []).map((team) => {
-      const visual = resultVisualStats(result, team);
-      return {
-        ...team,
-        games: visual.games,
-        losses: visual.losses
-      };
-    });
-
-    const pdfOptions = {
-      title: "Resultado de partida",
-      subtitle: result.reason || "Histórico de partida",
-      standings: processedStandings,
-      showPointsBalance: showPointsBalance,
-      exclusionAlert: result.exclusionAlert,
-      topPlayers: topPlayers,
-      teams: teamNames,
-      players: result.players,
-      schedule: result.schedule,
-      scores: result.scores,
-      onlyPlayed: true,
-      date: result.startedAt || result.finishedAt
-    };
     const res = window.buildVolleyPdf(pdfOptions);
     file = res?.file;
   }
@@ -209,7 +200,7 @@ resultsList.addEventListener("click", async (event) => {
     const numId = Number(id) || id;
     store.deleteResult(numId);
     await store.deleteResultFromCloud(numId);
-    await loadResults();
+    await loadResults(true);
   } else if (button.classList.contains("print-result")) {
     printResult(result);
   } else if (button.classList.contains("export-result")) {
@@ -227,54 +218,108 @@ async function loadMoreResults() {
   }
   currentCloudPage += 1;
   const store = getGameStore();
-  const { data: newCloudResults, hasMore, error } = await store.getCloudResults(currentCloudPage, PAGE_SIZE);
-  hasMoreCloudResults = hasMore;
+  const filters = getActiveFilters();
+  const { data: newCloudResults, hasMore, error } = await store.getCloudResults(currentCloudPage, PAGE_SIZE, filters);
+
+  if (error) {
+    console.warn("Erro ao carregar mais resultados do Supabase:", error);
+    const localResults = store.getResults();
+    const filtered = localResults.filter((result) => {
+      const matchDate = !filters.date || localDate(result.finishedAt) === filters.date;
+      const matchType = filters.type === "all" || resultGameType(result) === filters.type;
+      return matchDate && matchType;
+    }).sort((a, b) => new Date(b.finishedAt) - new Date(a.finishedAt));
+
+    const from = currentCloudPage * PAGE_SIZE;
+    const nextSlice = filtered.slice(from, from + PAGE_SIZE);
+    hasMoreCloudResults = filtered.length > from + nextSlice.length;
+    allResults = [...allResults, ...nextSlice];
+    renderResults();
+    return;
+  }
+
+  hasMoreCloudResults = Boolean(hasMore);
+  const validNew = Array.isArray(newCloudResults) ? newCloudResults : [];
   const existingIds = new Set(allResults.map((r) => String(r.id)));
-  const newUnique = (newCloudResults || []).filter((r) => !existingIds.has(String(r.id)));
-  allResults = [...allResults, ...newUnique].sort((a, b) => new Date(b.finishedAt) - new Date(a.finishedAt));
+  const newUnique = validNew.filter((r) => !existingIds.has(String(r.id)));
+  allResults = [...allResults, ...newUnique];
   renderResults();
 }
 
-async function loadResults() {
-  try {
+async function loadResults(reset = true) {
+  if (reset) {
     currentCloudPage = 0;
+    allResults = [];
+    updateFilterClearVisibility();
+    resultsList.innerHTML = `<div class="results-loading-state" style="text-align:center; padding:32px; color:var(--muted); font-size:0.95rem;"><p>Carregando resultados…</p></div>`;
+  }
+
+  try {
     const store = getGameStore();
-    const localResults = store.getResults();
-    const syncResponses = await Promise.all(localResults.map((result) => store.saveResultToCloud(result)));
-    const { data: cloudResults, hasMore, error } = await store.getCloudResults(0, PAGE_SIZE);
-    hasMoreCloudResults = hasMore;
-    const validCloudResults = Array.isArray(cloudResults) ? cloudResults : [];
-    const merged = [...validCloudResults, ...localResults.filter((local) => !validCloudResults.some((cloud) => String(cloud.id) === String(local.id)))]
-      .sort((a, b) => new Date(b.finishedAt) - new Date(a.finishedAt));
-    allResults = merged;
-    renderResults();
-    const syncError = syncResponses.find((response) => response?.error)?.error;
-    if (error || syncError) {
-      resultSyncStatus.textContent = "Não foi possível sincronizar com o Supabase. Verifique se o script supabase-schema.sql foi executado no projeto.";
+    const filters = getActiveFilters();
+
+    // Sincroniza jogos locais para o Supabase apenas uma vez na primeira inicialização
+    if (!hasSyncedLocal) {
+      hasSyncedLocal = true;
+      const localResults = store.getResults();
+      if (localResults.length > 0) {
+        await Promise.all(localResults.map((r) => store.saveResultToCloud(r)));
+      }
+    }
+
+    const { data: cloudResults, hasMore, error } = await store.getCloudResults(0, PAGE_SIZE, filters);
+
+    if (error) {
+      console.warn("Resultados do Supabase indisponíveis.", error);
+      // Fallback para dados locais caso o Supabase falhe ou esteja offline
+      const localResults = store.getResults();
+      const filtered = localResults.filter((result) => {
+        const matchDate = !filters.date || localDate(result.finishedAt) === filters.date;
+        const matchType = filters.type === "all" || resultGameType(result) === filters.type;
+        return matchDate && matchType;
+      }).sort((a, b) => new Date(b.finishedAt) - new Date(a.finishedAt));
+
+      hasMoreCloudResults = filtered.length > PAGE_SIZE;
+      allResults = filtered.slice(0, PAGE_SIZE);
+
+      resultSyncStatus.textContent = "Não foi possível sincronizar com o Supabase. Exibindo dados locais.";
       resultSyncStatus.className = "result-sync-status is-error";
-      console.warn("Resultados do Supabase indisponíveis.", error || syncError);
     } else {
-      resultSyncStatus.textContent = validCloudResults.length ? "Resultados sincronizados com sua conta." : "";
+      hasMoreCloudResults = Boolean(hasMore);
+      allResults = Array.isArray(cloudResults) ? cloudResults : [];
+      resultSyncStatus.textContent = allResults.length ? "Resultados sincronizados com sua conta." : "";
       resultSyncStatus.className = "result-sync-status";
     }
+
+    renderResults();
   } catch (err) {
     console.error("Erro ao carregar resultados:", err);
+    resultsList.innerHTML = `<section class="empty-results"><h2>Erro ao carregar</h2><p>Não foi possível carregar os resultados da partida.</p></section>`;
   } finally {
     document.body.classList.remove("app-loading");
   }
 }
 
-resultsDateFilter.addEventListener("input", () => { updateFilterClearVisibility(); renderResults(); });
-resultsDateFilter.addEventListener("change", () => { updateFilterClearVisibility(); renderResults(); });
-resultsTypeFilter.addEventListener("change", () => { updateFilterClearVisibility(); renderResults(); });
+let filterDebounceTimer = null;
+function handleFilterChange() {
+  updateFilterClearVisibility();
+  clearTimeout(filterDebounceTimer);
+  filterDebounceTimer = setTimeout(() => {
+    loadResults(true);
+  }, 120);
+}
+
+resultsDateFilter.addEventListener("input", handleFilterChange);
+resultsDateFilter.addEventListener("change", handleFilterChange);
+resultsTypeFilter.addEventListener("change", handleFilterChange);
+
 if (clearFilterBtn) {
   clearFilterBtn.addEventListener("click", () => {
     resultsDateFilter.value = "";
     resultsTypeFilter.value = "all";
     updateFilterClearVisibility();
-    renderResults();
+    loadResults(true);
   });
 }
 
-loadResults();
-
+loadResults(true);
