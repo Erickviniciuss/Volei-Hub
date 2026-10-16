@@ -1,4 +1,4 @@
-const CACHE_NAME = 'volei-hub-cache-v2.1.3';
+const CACHE_NAME = 'volei-hub-cache-v2.1.4';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -14,7 +14,6 @@ const CORE_ASSETS = [
   './manifest.json',
   './theme.js',
   './pwa.js',
-  './bluetooth-printer.js',
   './assets/favicon.png',
   './assets/logo_escuro.png',
   './assets/logo_claro.png',

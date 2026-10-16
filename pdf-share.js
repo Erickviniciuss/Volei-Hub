@@ -67,14 +67,6 @@
               <small id="pdf-opt-download-sub">Baixa o arquivo no seu dispositivo.</small>
             </div>
           </button>
-
-          <button id="pdf-opt-bt-print" class="pdf-share-opt opt-bt-print" type="button">
-            <span class="pdf-opt-icon" aria-hidden="true">🖨️</span>
-            <div class="pdf-opt-text">
-              <strong id="pdf-opt-bt-title">Imprimir Cupom</strong>
-              <small id="pdf-opt-bt-sub">Envio direto para impressora térmica Bluetooth (MY-7779 / 58mm).</small>
-            </div>
-          </button>
         </div>
 
         <div class="pdf-share-format-selector" id="pdf-share-format-selector">
@@ -591,78 +583,6 @@
       }
     };
 
-    // 4. Imprimir diretamente na Impressora Térmica Bluetooth (MY-7779 / 58mm / POS-58)
-    const btPrintBtn = modal.querySelector("#pdf-opt-bt-print");
-    const btPrintTitle = modal.querySelector("#pdf-opt-bt-title");
-    const btPrintSub = modal.querySelector("#pdf-opt-bt-sub");
-
-    if (btPrintBtn) {
-      if (window.bluetoothPrinter && window.bluetoothPrinter.isConnected()) {
-        const dName = window.bluetoothPrinter.getDeviceName();
-        if (btPrintSub) btPrintSub.textContent = `Conectada: ${dName}. Toque para imprimir agora.`;
-      }
-
-      btPrintBtn.onclick = async () => {
-        feedbackEl.hidden = true;
-        feedbackEl.textContent = "";
-
-        if (!window.bluetoothPrinter) {
-          feedbackEl.textContent = "Módulo de impressora Bluetooth não carregado.";
-          feedbackEl.className = "pdf-share-feedback is-error";
-          feedbackEl.hidden = false;
-          return;
-        }
-
-        if (!window.bluetoothPrinter.isSupported()) {
-          feedbackEl.innerHTML = `
-            <div style="text-align: left; font-size: 0.8rem; line-height: 1.4;">
-              <strong style="color:var(--ink);">Bluetooth não suportado neste navegador</strong><br/>
-              <small style="color:var(--muted);">A conexão direta requer Google Chrome, Microsoft Edge ou navegador com Web Bluetooth ativado no Android/PC.</small>
-            </div>
-          `;
-          feedbackEl.className = "pdf-share-feedback is-info";
-          feedbackEl.hidden = false;
-          return;
-        }
-
-        try {
-          if (!window.bluetoothPrinter.isConnected()) {
-            feedbackEl.textContent = "Selecione a sua impressora Bluetooth na janela do navegador...";
-            feedbackEl.className = "pdf-share-feedback is-info";
-            feedbackEl.hidden = false;
-            await window.bluetoothPrinter.connect();
-          }
-
-          feedbackEl.textContent = "Enviando dados para a impressora térmica...";
-          feedbackEl.className = "pdf-share-feedback is-info";
-          feedbackEl.hidden = false;
-
-          const optionsToPrint = rawPdfOptions || {
-            title: title || "Vôlei Hub",
-            subtitle: text || "",
-            teamsOnly: Boolean(file?._pdfOptions?.teamsOnly)
-          };
-
-          await window.bluetoothPrinter.printTicketFromOptions(optionsToPrint, (progress) => {
-            feedbackEl.textContent = `Imprimindo cupom... ${progress}%`;
-          });
-
-          feedbackEl.textContent = "Cupom impresso com sucesso na impressora Bluetooth!";
-          feedbackEl.className = "pdf-share-feedback is-success";
-          feedbackEl.hidden = false;
-          setTimeout(() => closePdfModal(), 2200);
-        } catch (err) {
-          if (err && (err.name === "NotFoundError" || err.message?.includes("cancelada"))) {
-            feedbackEl.hidden = true;
-            return;
-          }
-          feedbackEl.textContent = err.message || "Erro ao comunicar com a impressora térmica.";
-          feedbackEl.className = "pdf-share-feedback is-error";
-          feedbackEl.hidden = false;
-        }
-      };
-    }
-
     try {
       if (typeof modal.showModal === "function") {
         if (!modal.open) modal.showModal();
@@ -812,11 +732,11 @@
           }
         });
 
-        const W = 580; // 58mm escalado a 10px/mm para excelente nitidez térmica
-        const marginX = 35;
-        const printableW = 510;
-        const endX = marginX + printableW; // 545
-        const centerX = W / 2; // 290
+        const W = 384; // Padrão nativo 1:1 de impressoras térmicas 58mm (48mm a 203 DPI = 384 dots)
+        const marginX = 4; // Margem lateral mínima (4px) para estender o conteúdo de borda a borda do cupom
+        const printableW = W - 2 * marginX; // 376px de área útil total
+        const endX = marginX + printableW; // 380px
+        const centerX = W / 2; // 192px
 
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
@@ -840,21 +760,32 @@
           return lines;
         }
 
+        // Helper para truncar texto mantendo dentro da largura máxima
+        function fitText(txt, maxW, font) {
+          ctx.font = font;
+          let str = String(txt || "");
+          if (ctx.measureText(str).width <= maxW) return str;
+          while (ctx.measureText(str + "…").width > maxW && str.length > 2) {
+            str = str.slice(0, -1);
+          }
+          return str + "…";
+        }
+
         // Função de renderização (passo 1 mede a altura contínua exata, passo 2 desenha os pixels)
         function renderPass(isMeasuring) {
-          let y = 30; // Margem superior
+          let y = 16; // Margem superior compacta
 
-          // Cabeçalho Principal: VÔLEI HUB
+          // Cabeçalho Principal: VÔLEI HUB (Grande e em negrito para destaque)
           if (!isMeasuring) {
             ctx.fillStyle = "#000000";
-            ctx.font = "bold 26px Arial, Helvetica, sans-serif";
+            ctx.font = "bold 28px Arial, Helvetica, sans-serif";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
-            ctx.fillText("VÔLEI HUB", centerX, y + 12);
+            ctx.fillText("VÔLEI HUB", centerX, y + 14);
           }
-          y += 28;
+          y += 32;
 
-          // Linha divisória
+          // Linha divisória grossa de ponta a ponta
           if (!isMeasuring) {
             ctx.strokeStyle = "#000000";
             ctx.lineWidth = 2.5;
@@ -863,11 +794,11 @@
             ctx.lineTo(endX, y);
             ctx.stroke();
           }
-          y += 18;
+          y += 14;
 
-          // Título do documento
+          // Título do documento (visível e nítido)
           const titleText = String(options.title || "Resultado").toUpperCase();
-          const titleFont = "bold 20px Arial, Helvetica, sans-serif";
+          const titleFont = "bold 18px Arial, Helvetica, sans-serif";
           const titleLines = splitText(titleText, printableW, titleFont);
           if (!isMeasuring) {
             ctx.font = titleFont;
@@ -875,14 +806,14 @@
             ctx.textAlign = "center";
             ctx.textBaseline = "top";
             titleLines.forEach((tl, i) => {
-              ctx.fillText(tl, centerX, y + i * 26);
+              ctx.fillText(tl, centerX, y + i * 24);
             });
           }
-          y += titleLines.length * 26 + 6;
+          y += titleLines.length * 24 + 4;
 
           // Subtítulo
           if (options.subtitle) {
-            const subFont = "bold 15px Arial, Helvetica, sans-serif";
+            const subFont = "bold 13px Arial, Helvetica, sans-serif";
             const subLines = splitText(String(options.subtitle), printableW, subFont);
             if (!isMeasuring) {
               ctx.font = subFont;
@@ -890,10 +821,10 @@
               ctx.textAlign = "center";
               ctx.textBaseline = "top";
               subLines.forEach((sl, i) => {
-                ctx.fillText(sl, centerX, y + i * 20);
+                ctx.fillText(sl, centerX, y + i * 18);
               });
             }
-            y += subLines.length * 20 + 8;
+            y += subLines.length * 18 + 6;
           }
 
           // Linha divisória
@@ -905,31 +836,32 @@
             ctx.lineTo(endX, y);
             ctx.stroke();
           }
-          y += 24;
+          y += 18;
 
-          // Seção: Classificação Final
+          // Seção: Classificação Final (Faixa preta cheia de 376px)
           if (Array.isArray(standings) && standings.length > 0) {
+            const secH = 30;
             if (!isMeasuring) {
               ctx.fillStyle = "#000000";
-              ctx.fillRect(marginX, y, printableW, 30);
+              ctx.fillRect(marginX, y, printableW, secH);
               ctx.fillStyle = "#ffffff";
               ctx.font = "bold 16px Arial, Helvetica, sans-serif";
               ctx.textAlign = "center";
               ctx.textBaseline = "middle";
-              ctx.fillText("CLASSIFICAÇÃO FINAL", centerX, y + 15);
+              ctx.fillText("CLASSIFICAÇÃO FINAL", centerX, y + secH / 2);
             }
-            y += 30;
+            y += secH;
 
             const headers = showSaldo
               ? ["#", "Equipe", "V", "D", "Pts", "SG"]
               : ["#", "Equipe", "V", "D", "J"];
             const colWidths = showSaldo
-              ? [48, 222, 60, 60, 60, 60]
-              : [50, 260, 66, 66, 68];
+              ? [32, 164, 44, 44, 46, 46]
+              : [34, 198, 48, 48, 48];
 
             const headerH = 28;
             if (!isMeasuring) {
-              ctx.fillStyle = "#e5e5e5";
+              ctx.fillStyle = "#dcdcdc";
               ctx.fillRect(marginX, y, printableW, headerH);
               let curX = marginX;
               headers.forEach((h, i) => {
@@ -941,7 +873,7 @@
                 ctx.textBaseline = "middle";
                 if (i === 1) {
                   ctx.textAlign = "left";
-                  ctx.fillText(h, curX + 8, y + headerH / 2);
+                  ctx.fillText(h, curX + 6, y + headerH / 2);
                 } else {
                   ctx.textAlign = "center";
                   ctx.fillText(h, curX + colWidths[i] / 2, y + headerH / 2);
@@ -951,7 +883,7 @@
             }
             y += headerH;
 
-            const rowH = 30;
+            const rowH = 34;
             standings.forEach((team, idx) => {
               if (!isMeasuring) {
                 const isEven = idx % 2 === 0;
@@ -988,11 +920,7 @@
                   ctx.textBaseline = "middle";
                   if (i === 1) {
                     ctx.textAlign = "left";
-                    let safeName = val;
-                    while (ctx.measureText(safeName).width > colWidths[i] - 14 && safeName.length > 4) {
-                      safeName = safeName.slice(0, -2) + "…";
-                    }
-                    ctx.fillText(safeName, curX + 8, y + rowH / 2);
+                    ctx.fillText(fitText(val, colWidths[i] - 10, "bold 14px Arial, Helvetica, sans-serif"), curX + 6, y + rowH / 2);
                   } else {
                     ctx.textAlign = "center";
                     ctx.fillText(val, curX + colWidths[i] / 2, y + rowH / 2);
@@ -1002,12 +930,12 @@
               }
               y += rowH;
             });
-            y += 24;
+            y += 18;
 
             if (options.exclusionAlert) {
-              const alertFont = "bold 13px Arial, Helvetica, sans-serif";
-              const alertLines = splitText(String(options.exclusionAlert), printableW - 20, alertFont);
-              const alertH = alertLines.length * 20 + 16;
+              const alertFont = "bold 12px Arial, Helvetica, sans-serif";
+              const alertLines = splitText(String(options.exclusionAlert), printableW - 16, alertFont);
+              const alertH = alertLines.length * 18 + 12;
               if (!isMeasuring) {
                 ctx.fillStyle = "#fef3c7";
                 ctx.fillRect(marginX, y, printableW, alertH);
@@ -1019,42 +947,43 @@
                 ctx.textAlign = "left";
                 ctx.textBaseline = "top";
                 alertLines.forEach((al, i) => {
-                  ctx.fillText(al, marginX + 10, y + 8 + i * 20);
+                  ctx.fillText(al, marginX + 8, y + 6 + i * 18);
                 });
               }
-              y += alertH + 24;
+              y += alertH + 18;
             }
           }
 
           // Seção: Top Jogadores
           if (topPlayers.length > 0) {
+            const secH = 30;
             if (!isMeasuring) {
               ctx.fillStyle = "#000000";
-              ctx.fillRect(marginX, y, printableW, 30);
+              ctx.fillRect(marginX, y, printableW, secH);
               ctx.fillStyle = "#ffffff";
               ctx.font = "bold 16px Arial, Helvetica, sans-serif";
               ctx.textAlign = "center";
               ctx.textBaseline = "middle";
-              ctx.fillText("TOP JOGADORES", centerX, y + 15);
+              ctx.fillText("TOP JOGADORES", centerX, y + secH / 2);
             }
-            y += 38;
+            y += secH + 10;
 
             const top10 = topPlayers.slice(0, 10);
             top10.forEach((p, i) => {
               if (!isMeasuring) {
                 ctx.fillStyle = "#000000";
-                ctx.font = "bold 15px Arial, Helvetica, sans-serif";
+                ctx.font = "bold 14px Arial, Helvetica, sans-serif";
                 ctx.textAlign = "left";
                 ctx.textBaseline = "middle";
                 const itemText = `${i + 1}º ${p.name} (${p.team}) · ${p.points} pts`;
-                ctx.fillText(itemText, marginX + 8, y);
+                ctx.fillText(itemText, marginX + 6, y + 11);
               }
-              y += 24;
+              y += 22;
             });
-            y += 18;
+            y += 14;
           }
 
-          // Seção: Participantes por Equipe
+          // Seção: Participantes por Equipe (fontes maiores e nomes destacados)
           if (teamsWithPlayers.length > 0) {
             const isTeamsOnly = Boolean(options.teamsOnly);
             const sectionH = isTeamsOnly ? 34 : 30;
@@ -1067,49 +996,52 @@
               ctx.textBaseline = "middle";
               ctx.fillText("EQUIPES E INTEGRANTES", centerX, y + sectionH / 2);
             }
-            y += sectionH + 12;
+            y += sectionH + 10;
 
             teamsWithPlayers.forEach((teamObj) => {
-              const headerH = isTeamsOnly ? 36 : 30;
+              const headerH = isTeamsOnly ? 34 : 28;
               if (!isMeasuring) {
-                ctx.fillStyle = "#e5e5e5";
+                ctx.fillStyle = "#e0e0e0";
                 ctx.fillRect(marginX, y, printableW, headerH);
+                ctx.strokeStyle = "#000000";
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(marginX, y, printableW, headerH);
                 ctx.fillStyle = "#000000";
-                ctx.font = isTeamsOnly ? "bold 20px Arial, sans-serif" : "bold 17px Arial, sans-serif";
+                ctx.font = isTeamsOnly ? "bold 18px Arial, sans-serif" : "bold 16px Arial, sans-serif";
                 ctx.textAlign = "left";
                 ctx.textBaseline = "middle";
-                ctx.fillText(teamObj.name, marginX + 12, y + headerH / 2);
+                ctx.fillText(teamObj.name, marginX + 8, y + headerH / 2);
               }
-              y += headerH + 8;
+              y += headerH + 6;
 
-              const memberH = isTeamsOnly ? 28 : 24;
+              const memberH = isTeamsOnly ? 27 : 24;
               teamObj.members.forEach((member) => {
                 const bulletText = `• ${member}`;
-                const mLines = splitText(bulletText, printableW - 20, isTeamsOnly ? "bold 18px Arial, sans-serif" : "bold 15px Arial, sans-serif");
+                const mLines = splitText(bulletText, printableW - 16, isTeamsOnly ? "bold 17px Arial, sans-serif" : "bold 15px Arial, sans-serif");
                 if (!isMeasuring) {
                   ctx.fillStyle = "#000000";
-                  ctx.font = isTeamsOnly ? "bold 18px Arial, sans-serif" : "bold 15px Arial, sans-serif";
+                  ctx.font = isTeamsOnly ? "bold 17px Arial, sans-serif" : "bold 15px Arial, sans-serif";
                   ctx.textAlign = "left";
-                  ctx.textBaseline = "top";
+                  ctx.textBaseline = "middle";
                   mLines.forEach((ml, mi) => {
-                    ctx.fillText(ml, marginX + 14, y + mi * memberH);
+                    ctx.fillText(ml, marginX + 10, y + mi * memberH + memberH / 2);
                   });
                 }
                 y += mLines.length * memberH;
               });
 
-              y += isTeamsOnly ? 14 : 10;
+              y += isTeamsOnly ? 10 : 8;
               if (!isMeasuring) {
-                ctx.strokeStyle = "#bbbbbb";
+                ctx.strokeStyle = "#aaaaaa";
                 ctx.lineWidth = 1.2;
                 ctx.beginPath();
                 ctx.moveTo(marginX, y);
                 ctx.lineTo(endX, y);
                 ctx.stroke();
               }
-              y += isTeamsOnly ? 18 : 14;
+              y += isTeamsOnly ? 14 : 12;
             });
-            y += 10;
+            y += 8;
           }
 
           // Seção: Jogos por Rodada
@@ -1123,14 +1055,14 @@
               ctx.textBaseline = "middle";
               ctx.fillText(options.onlyPlayed ? "JOGOS REALIZADOS" : "JOGOS POR RODADA", centerX, y + 15);
             }
-            y += 40;
+            y += 42;
 
             roundsToRender.forEach((roundData) => {
               const { roundIdx, matches, bye } = roundData;
-              const headerH = 28;
-              const matchLineH = 34;
-              const byeH = bye ? 26 : 0;
-              const cardH = headerH + matches.length * matchLineH + byeH + 12;
+              const headerH = 26;
+              const matchLineH = 36;
+              const byeH = bye ? 24 : 0;
+              const cardH = headerH + matches.length * matchLineH + byeH + 6;
 
               if (!isMeasuring) {
                 // Fundo branco do card
@@ -1138,11 +1070,11 @@
                 ctx.fillRect(marginX, y, printableW, cardH);
                 // Borda do card
                 ctx.strokeStyle = "#000000";
-                ctx.lineWidth = 2.5;
+                ctx.lineWidth = 2;
                 ctx.strokeRect(marginX, y, printableW, cardH);
 
                 // Topo cinza da rodada
-                ctx.fillStyle = "#e5e5e5";
+                ctx.fillStyle = "#e0e0e0";
                 ctx.fillRect(marginX, y, printableW, headerH);
                 ctx.beginPath();
                 ctx.moveTo(marginX, y + headerH);
@@ -1155,61 +1087,61 @@
                 ctx.textBaseline = "middle";
                 ctx.fillText(`Rodada ${roundIdx + 1}`, centerX, y + headerH / 2);
 
-                let curMatchY = y + headerH + 20;
+                let curMatchY = y + headerH + matchLineH / 2;
                 matches.forEach(({ home, away, scoreStr }) => {
                   ctx.fillStyle = "#000000";
-                  ctx.font = "bold 15px Arial, Helvetica, sans-serif";
                   ctx.textBaseline = "middle";
 
                   // Time Mandante
+                  ctx.font = "bold 15px Arial, Helvetica, sans-serif";
                   ctx.textAlign = "right";
-                  ctx.fillText(String(home), centerX - 42, curMatchY);
+                  ctx.fillText(fitText(home, 138, "bold 15px Arial, Helvetica, sans-serif"), centerX - 32, curMatchY);
 
                   // Placar central
-                  ctx.textAlign = "center";
                   ctx.font = "bold 18px Arial, Helvetica, sans-serif";
+                  ctx.textAlign = "center";
                   ctx.fillText(scoreStr, centerX, curMatchY);
 
                   // Time Visitante
                   ctx.font = "bold 15px Arial, Helvetica, sans-serif";
                   ctx.textAlign = "left";
-                  ctx.fillText(String(away), centerX + 42, curMatchY);
+                  ctx.fillText(fitText(away, 138, "bold 15px Arial, Helvetica, sans-serif"), centerX + 32, curMatchY);
 
                   curMatchY += matchLineH;
                 });
 
                 if (bye) {
                   ctx.fillStyle = "#000000";
-                  ctx.font = "bold 14px Arial, Helvetica, sans-serif";
+                  ctx.font = "bold 13px Arial, Helvetica, sans-serif";
                   ctx.textAlign = "center";
                   ctx.textBaseline = "middle";
-                  ctx.fillText(`Folga: ${bye}`, centerX, curMatchY - 4);
+                  ctx.fillText(`Folga: ${bye}`, centerX, curMatchY - 6);
                 }
               }
 
-              y += cardH + 22;
+              y += cardH + 14;
             });
-            y += 8;
+            y += 6;
           }
 
           // Rodapé do Cupom
           let dateVal = new Date(options.date || Date.now());
           if (isNaN(dateVal.getTime())) dateVal = new Date();
-          y += 10;
+          y += 6;
           if (!isMeasuring) {
             ctx.fillStyle = "#000000";
-            ctx.font = "bold 14px Arial, Helvetica, sans-serif";
+            ctx.font = "bold 13px Arial, Helvetica, sans-serif";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
             ctx.fillText(`Emitido em: ${dateVal.toLocaleString("pt-BR")}`, centerX, y);
           }
-          y += 24;
+          y += 20;
 
           if (!isMeasuring) {
-            ctx.font = "bold 15px monospace";
+            ctx.font = "bold 14px monospace";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
-            ctx.fillText("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -", centerX, y);
+            ctx.fillText("- - - - - - - - - - - - - - - - - - - - - - -", centerX, y);
           }
           y += 30; // Margem para corte do papel
 
