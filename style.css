@@ -1225,6 +1225,23 @@ body[data-theme="dark"] .pdf-share-feedback {
   box-shadow: none;
 }
 
+.pdf-fmt-btn.is-full-width {
+  grid-column: 1 / -1;
+  background: rgba(16, 185, 129, 0.05);
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+.pdf-fmt-btn.is-full-width:hover {
+  border-color: rgba(16, 185, 129, 0.5);
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.pdf-fmt-btn.is-full-width.is-active {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.16);
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.35);
+}
+
 .pdf-fmt-btn:hover {
   border-color: rgba(56, 189, 248, 0.45);
   background: rgba(56, 189, 248, 0.06);
@@ -1266,7 +1283,7 @@ body[data-theme="dark"] .pdf-fmt-btn.is-active {
 .pdf-fmt-text small {
   font-size: 0.68rem;
   color: var(--muted);
-  white-space: nowrap;
+  white-space: normal;
 }
 
 /* Responsividade refinada para Mobile */

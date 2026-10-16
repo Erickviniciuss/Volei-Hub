@@ -49,8 +49,8 @@
               </svg>
             </span>
             <div class="pdf-opt-text">
-              <strong>Compartilhar PDF</strong>
-              <small>Usa o compartilhamento nativo do seu celular/sistema.</small>
+              <strong id="pdf-opt-device-title">Compartilhar PDF</strong>
+              <small id="pdf-opt-device-sub">Usa o compartilhamento nativo do seu celular/sistema.</small>
             </div>
           </button>
 
@@ -63,27 +63,33 @@
               </svg>
             </span>
             <div class="pdf-opt-text">
-              <strong>Baixar PDF</strong>
-              <small>Baixa o pdf no seu dispositivo.</small>
+              <strong id="pdf-opt-download-title">Baixar PDF</strong>
+              <small id="pdf-opt-download-sub">Baixa o arquivo no seu dispositivo.</small>
             </div>
           </button>
         </div>
 
         <div class="pdf-share-format-selector" id="pdf-share-format-selector">
-          <span class="pdf-format-label">Modelo do PDF</span>
-          <div class="pdf-format-options" role="radiogroup" aria-label="Modelo do PDF">
+          <span class="pdf-format-label">Modelo de Envio / Impressão</span>
+          <div class="pdf-format-options" role="radiogroup" aria-label="Modelo de Envio">
             <button type="button" class="pdf-fmt-btn is-active" id="pdf-fmt-a4" data-format="a4" role="radio" aria-checked="true">
               <span class="pdf-fmt-icon" aria-hidden="true">📄</span>
               <div class="pdf-fmt-text">
                 <strong>Padrão A4</strong>
-                <small>Folha padrão</small>
+                <small>Folha PDF</small>
               </div>
             </button>
             <button type="button" class="pdf-fmt-btn" id="pdf-fmt-cupom" data-format="cupom" role="radio" aria-checked="false">
               <span class="pdf-fmt-icon" aria-hidden="true">🧾</span>
               <div class="pdf-fmt-text">
-                <strong>Cupom 58mm</strong>
-                <small>Bobina térmica</small>
+                <strong>Cupom PDF</strong>
+                <small>Bobina 58mm</small>
+              </div>
+            </button>
+            <button type="button" class="pdf-fmt-btn is-full-width" id="pdf-fmt-cupom-img" data-format="cupom-img" role="radio" aria-checked="false">
+              <span class="pdf-fmt-icon" aria-hidden="true">🖼️</span>
+              <div class="pdf-fmt-text">
+                <strong>Foto Cupom (PNG)</strong>
               </div>
             </button>
           </div>
@@ -196,15 +202,57 @@
     unlockBackground();
   }
 
-  function downloadPdfFile(file) {
-    if (!file) return;
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(file);
-    link.download = file.name || "VoleiHub-Documento.pdf";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(() => URL.revokeObjectURL(link.href), 3000);
+  function downloadPdfFile(file, optionalDataUrl) {
+    if (!file && !optionalDataUrl) return;
+    const fileName = file?.name || "VoleiHub-Documento.png";
+    const rawDataUrl = optionalDataUrl || file?._dataUrl;
+
+    try {
+      let downloadUrl = null;
+      let shouldRevoke = false;
+
+      if (file && (file instanceof Blob || file instanceof File)) {
+        downloadUrl = URL.createObjectURL(file);
+        shouldRevoke = true;
+      } else if (rawDataUrl) {
+        // Se temos dataUrl mas não blob, convertemos para blob para download nativo perfeito
+        try {
+          const parts = rawDataUrl.split(",");
+          const mimeMatch = parts[0].match(/:(.*?);/);
+          const mime = mimeMatch ? mimeMatch[1] : "image/png";
+          const bstr = atob(parts[1]);
+          let n = bstr.length;
+          const u8arr = new Uint8Array(n);
+          while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+          }
+          const blob = new Blob([u8arr], { type: mime });
+          downloadUrl = URL.createObjectURL(blob);
+          shouldRevoke = true;
+        } catch (_) {
+          downloadUrl = rawDataUrl;
+        }
+      }
+
+      if (!downloadUrl) return;
+
+      const link = document.createElement("a");
+      link.style.display = "none";
+      link.setAttribute("download", fileName);
+      link.href = downloadUrl;
+      // IMPORTANTE: NÃO colocar target="_blank" pois o Chrome bloqueia navegações para data/blob URL e não baixa o arquivo
+      document.body.appendChild(link);
+      link.click();
+
+      setTimeout(() => {
+        link.remove();
+        if (shouldRevoke && downloadUrl) {
+          try { URL.revokeObjectURL(downloadUrl); } catch (_) {}
+        }
+      }, 4000);
+    } catch (err) {
+      console.warn("Falha no download via link:", err);
+    }
   }
 
   async function copyTextToClipboard(content) {
@@ -265,26 +313,63 @@
     const formatSelectorEl = modal.querySelector("#pdf-share-format-selector");
     const fmtA4Btn = modal.querySelector("#pdf-fmt-a4");
     const fmtCupomBtn = modal.querySelector("#pdf-fmt-cupom");
+    const fmtCupomImgBtn = modal.querySelector("#pdf-fmt-cupom-img");
+    const deviceTitleEl = modal.querySelector("#pdf-opt-device-title");
+    const deviceSubEl = modal.querySelector("#pdf-opt-device-sub");
+    const downloadTitleEl = modal.querySelector("#pdf-opt-download-title");
+    const downloadSubEl = modal.querySelector("#pdf-opt-download-sub");
 
     feedbackEl.hidden = true;
     feedbackEl.textContent = "";
 
     const rawPdfOptions = pdfOptions || file?._pdfOptions || null;
-    let activeFormat = "a4"; // Por padrão, selecionada a opção A4
+    let activeFormat = "a4"; // Opções: "a4", "cupom", "cupom-img"
     let a4File = (file && (file instanceof Blob || file instanceof File)) ? file : null;
     let cupomFile = null;
+    let cupomImgFile = null;
     let currentFile = a4File;
+
+    // Pré-gerar a Foto do Cupom (PNG) imediatamente em segundo plano
+    // para que ao clicar a imagem já esteja 100% pronta e o download seja instantâneo
+    let cupomImgPromise = null;
+    if (rawPdfOptions && typeof window.buildVolleyCupomImage === "function") {
+      cupomImgPromise = window.buildVolleyCupomImage(rawPdfOptions).then((res) => {
+        if (res?.file) {
+          cupomImgFile = res.file;
+          if (res.dataUrl) cupomImgFile._dataUrl = res.dataUrl;
+        }
+        return cupomImgFile;
+      }).catch((err) => {
+        console.warn("Pré-geração da foto do cupom:", err);
+        return null;
+      });
+    }
 
     function updateFileInfoDisplay(targetFile, formatType) {
       if (targetFile && (targetFile instanceof Blob || targetFile instanceof File)) {
-        filenameEl.textContent = targetFile.name || "documento.pdf";
+        filenameEl.textContent = targetFile.name || (formatType === "cupom-img" ? "cupom.png" : "documento.pdf");
         const sizeKb = Math.round((targetFile.size || 0) / 1024);
-        if (formatType === "cupom") {
+        if (formatType === "cupom-img") {
+          if (fileIconEl) fileIconEl.textContent = "🖼️";
+          filesizeEl.textContent = sizeKb > 0 ? `${sizeKb} KB · Imagem PNG` : "Imagem PNG";
+          if (deviceTitleEl) deviceTitleEl.textContent = "Compartilhar Foto";
+          if (deviceSubEl) deviceSubEl.textContent = "Envia a foto para o WhatsApp ou app da impressora.";
+          if (downloadTitleEl) downloadTitleEl.textContent = "Baixar Foto (PNG)";
+          if (downloadSubEl) downloadSubEl.textContent = "Salva a foto do cupom no seu dispositivo.";
+        } else if (formatType === "cupom") {
           if (fileIconEl) fileIconEl.textContent = "🧾";
           filesizeEl.textContent = sizeKb > 0 ? `${sizeKb} KB · Cupom 58mm pronto para envio` : "Cupom 58mm pronto para envio";
+          if (deviceTitleEl) deviceTitleEl.textContent = "Compartilhar PDF";
+          if (deviceSubEl) deviceSubEl.textContent = "Usa o compartilhamento nativo do seu celular/sistema.";
+          if (downloadTitleEl) downloadTitleEl.textContent = "Baixar PDF";
+          if (downloadSubEl) downloadSubEl.textContent = "Baixa o pdf no seu dispositivo.";
         } else {
           if (fileIconEl) fileIconEl.textContent = "📄";
           filesizeEl.textContent = sizeKb > 0 ? `${sizeKb} KB · Documento PDF pronto para envio` : "Documento PDF pronto para envio";
+          if (deviceTitleEl) deviceTitleEl.textContent = "Compartilhar PDF";
+          if (deviceSubEl) deviceSubEl.textContent = "Usa o compartilhamento nativo do seu celular/sistema.";
+          if (downloadTitleEl) downloadTitleEl.textContent = "Baixar PDF";
+          if (downloadSubEl) downloadSubEl.textContent = "Baixa o pdf no seu dispositivo.";
         }
         downloadBtn.hidden = false;
         textSubtext.textContent = "Copia o texto do resumo para a área de transferência.";
@@ -297,25 +382,29 @@
       }
     }
 
-    // Configuração do Seletor de Modelo (A4 vs Cupom 58mm)
+    // Configuração do Seletor de Modelo (A4, Cupom PDF, Foto Cupom PNG)
     if (formatSelectorEl) {
       const canToggleFormat = Boolean(rawPdfOptions || a4File);
       formatSelectorEl.hidden = !canToggleFormat;
 
       // Reseta visual para A4 como padrão sempre ao abrir
-      if (fmtA4Btn && fmtCupomBtn) {
-        fmtA4Btn.classList.add("is-active");
-        fmtA4Btn.setAttribute("aria-checked", "true");
-        fmtCupomBtn.classList.remove("is-active");
-        fmtCupomBtn.setAttribute("aria-checked", "false");
+      fmtA4Btn?.classList.add("is-active");
+      fmtA4Btn?.setAttribute("aria-checked", "true");
+      fmtCupomBtn?.classList.remove("is-active");
+      fmtCupomBtn?.setAttribute("aria-checked", "false");
+      fmtCupomImgBtn?.classList.remove("is-active");
+      fmtCupomImgBtn?.setAttribute("aria-checked", "false");
 
+      if (fmtA4Btn) {
         fmtA4Btn.onclick = () => {
           if (activeFormat === "a4") return;
           activeFormat = "a4";
           fmtA4Btn.classList.add("is-active");
           fmtA4Btn.setAttribute("aria-checked", "true");
-          fmtCupomBtn.classList.remove("is-active");
-          fmtCupomBtn.setAttribute("aria-checked", "false");
+          fmtCupomBtn?.classList.remove("is-active");
+          fmtCupomBtn?.setAttribute("aria-checked", "false");
+          fmtCupomImgBtn?.classList.remove("is-active");
+          fmtCupomImgBtn?.setAttribute("aria-checked", "false");
 
           if (!a4File && rawPdfOptions && typeof window.buildVolleyPdf === "function") {
             const res = window.buildVolleyPdf({ ...rawPdfOptions, format: "a4" });
@@ -327,14 +416,18 @@
             updateFileInfoDisplay(currentFile, "a4");
           }
         };
+      }
 
+      if (fmtCupomBtn) {
         fmtCupomBtn.onclick = () => {
           if (activeFormat === "cupom") return;
           activeFormat = "cupom";
           fmtCupomBtn.classList.add("is-active");
           fmtCupomBtn.setAttribute("aria-checked", "true");
-          fmtA4Btn.classList.remove("is-active");
-          fmtA4Btn.setAttribute("aria-checked", "false");
+          fmtA4Btn?.classList.remove("is-active");
+          fmtA4Btn?.setAttribute("aria-checked", "false");
+          fmtCupomImgBtn?.classList.remove("is-active");
+          fmtCupomImgBtn?.setAttribute("aria-checked", "false");
 
           if (!cupomFile && rawPdfOptions && typeof window.buildVolleyPdf === "function") {
             const res = window.buildVolleyPdf({ ...rawPdfOptions, format: "cupom" });
@@ -344,6 +437,38 @@
           if (cupomFile) {
             currentFile = cupomFile;
             updateFileInfoDisplay(currentFile, "cupom");
+          }
+        };
+      }
+
+      if (fmtCupomImgBtn) {
+        fmtCupomImgBtn.onclick = async () => {
+          activeFormat = "cupom-img";
+          fmtCupomImgBtn.classList.add("is-active");
+          fmtCupomImgBtn.setAttribute("aria-checked", "true");
+          fmtA4Btn?.classList.remove("is-active");
+          fmtA4Btn?.setAttribute("aria-checked", "false");
+          fmtCupomBtn?.classList.remove("is-active");
+          fmtCupomBtn?.setAttribute("aria-checked", "false");
+
+          if (!cupomImgFile) {
+            if (filesizeEl) filesizeEl.textContent = "Gerando foto do cupom...";
+            if (cupomImgPromise) {
+              await cupomImgPromise;
+            } else if (rawPdfOptions && typeof window.buildVolleyCupomImage === "function") {
+              const res = await window.buildVolleyCupomImage(rawPdfOptions);
+              cupomImgFile = res?.file;
+              if (res?.dataUrl && cupomImgFile) cupomImgFile._dataUrl = res.dataUrl;
+            }
+          }
+
+          if (cupomImgFile) {
+            currentFile = cupomImgFile;
+            updateFileInfoDisplay(currentFile, "cupom-img");
+            downloadPdfFile(currentFile, currentFile._dataUrl);
+            feedbackEl.textContent = "Download da foto do cupom iniciado!";
+            feedbackEl.className = "pdf-share-feedback is-success";
+            feedbackEl.hidden = false;
           }
         };
       }
@@ -373,7 +498,7 @@
       }
     };
 
-    // 2. Compartilhar PDF (compartilhamento nativo com suporte a A4 e Cupom 58mm)
+    // 2. Compartilhar Arquivo (compatível com PDF e Imagem PNG para impressoras térmicas)
     deviceBtn.onclick = async () => {
       feedbackEl.hidden = true;
       feedbackEl.textContent = "";
@@ -385,14 +510,17 @@
         try {
           let preparedFile = fileToShareNow;
           try {
-            const cleanName = (fileToShareNow.name || "VoleiHub.pdf").replace(/[^\w.-]/g, "_");
-            preparedFile = new File([fileToShareNow], cleanName, { type: "application/pdf", lastModified: Date.now() });
+            const isPng = (fileToShareNow.name || "").toLowerCase().endsWith(".png") || fileToShareNow.type === "image/png";
+            const mime = isPng ? "image/png" : "application/pdf";
+            const defaultName = isPng ? "VoleiHubCupom.png" : "VoleiHub.pdf";
+            const cleanName = (fileToShareNow.name || defaultName).replace(/[^\w.-]/g, "_");
+            preparedFile = new File([fileToShareNow], cleanName, { type: mime, lastModified: Date.now() });
           } catch (_) {
             preparedFile = fileToShareNow;
           }
 
           await navigator.share({
-            title: title || "Vôlei Hub",
+            title: title || (activeFormat === "cupom-img" ? "Vôlei Hub - Foto Cupom" : "Vôlei Hub"),
             files: [preparedFile]
           });
           closePdfModal();
@@ -406,7 +534,7 @@
           try {
             await navigator.share({
               title: title || "Vôlei Hub",
-              text: text || "Vôlei Hub - PDF"
+              text: text || "Vôlei Hub"
             });
             closePdfModal();
             return;
@@ -414,13 +542,14 @@
         }
       }
 
+      const isPng = currentFile && ((currentFile.name || "").toLowerCase().endsWith(".png") || currentFile.type === "image/png");
       feedbackEl.innerHTML = `
         <div style="text-align: left; line-height: 1.4;">
           <strong style="color:var(--ink);">Compartilhamento nativo indisponível</strong><br />
-          <small style="color:var(--muted);">O menu do celular é bloqueado pelo navegador em conexões HTTP locais (requer HTTPS). Você pode abrir pelo WhatsApp ou baixar o PDF:</small>
+          <small style="color:var(--muted);">O menu do celular é bloqueado pelo navegador em conexões HTTP locais (requer HTTPS). Você pode abrir pelo WhatsApp ou baixar o arquivo:</small>
           <div style="margin-top: 8px; display: flex; gap: 8px;">
             <button id="pdf-fallback-wa" type="button" style="flex:1; padding: 8px 10px; border-radius: 8px; border: none; background: #25d366; color: #fff; cursor: pointer; font-size: 0.8rem; font-weight: 600;">Abrir WhatsApp</button>
-            <button id="pdf-fallback-dl" type="button" style="flex:1; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--soft-card); color: var(--ink); cursor: pointer; font-size: 0.8rem;">Baixar PDF</button>
+            <button id="pdf-fallback-dl" type="button" style="flex:1; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--soft-card); color: var(--ink); cursor: pointer; font-size: 0.8rem;">${isPng ? "Baixar Foto" : "Baixar PDF"}</button>
           </div>
         </div>
       `;
@@ -437,16 +566,17 @@
       const dlBtn = feedbackEl.querySelector("#pdf-fallback-dl");
       if (dlBtn) {
         dlBtn.onclick = () => {
-          if (currentFile) downloadPdfFile(currentFile);
+          if (currentFile) downloadPdfFile(currentFile, currentFile._dataUrl);
         };
       }
     };
 
-    // 3. Baixar PDF (download direto no dispositivo)
+    // 3. Baixar Arquivo (download direto no dispositivo)
     downloadBtn.onclick = () => {
       if (currentFile) {
-        downloadPdfFile(currentFile);
-        feedbackEl.textContent = "Download do PDF iniciado!";
+        downloadPdfFile(currentFile, currentFile._dataUrl);
+        const isPng = (currentFile.name || "").toLowerCase().endsWith(".png") || currentFile.type === "image/png";
+        feedbackEl.textContent = isPng ? "Download da foto do cupom iniciado!" : "Download do PDF iniciado!";
         feedbackEl.className = "pdf-share-feedback is-success";
         feedbackEl.hidden = false;
         setTimeout(() => closePdfModal(), 1800);
@@ -520,7 +650,573 @@
   }
   window.formatVolleyRoundsText = formatVolleyRoundsText;
 
-  // Gerador de Cupom Térmico 58mm Contínuo
+  // Gerador de Foto do Cupom Térmico 58mm em Imagem Contínua (PNG de alta nitidez)
+  function buildVolleyCupomImage(options = {}) {
+    return new Promise((resolve) => {
+      try {
+        const standings = options.teamsOnly ? null : options.standings;
+        const schedule = options.teamsOnly ? [] : (options.schedule || []);
+        const topPlayers = (!options.teamsOnly && Array.isArray(options.topPlayers)) ? options.topPlayers : [];
+        const showSaldo = options.showPointsBalance !== false;
+
+        // 1. Participantes por Equipe
+        const rawTeams = options.teams?.length
+          ? options.teams
+          : (standings && standings.length > 0 ? standings.map((s) => s.name) : []);
+
+        const teamsWithPlayers = [];
+        rawTeams.forEach((teamName, teamIdx) => {
+          let rawMembers = [];
+          if (Array.isArray(options.players) && options.players[teamIdx]) {
+            rawMembers = Array.isArray(options.players[teamIdx]) ? options.players[teamIdx] : [options.players[teamIdx]];
+          }
+          const cleanMembers = rawMembers
+            .map((p) => String(p || "").trim())
+            .filter((p) => p !== "" && p !== "Vazio");
+
+          if (cleanMembers.length > 0 || options.teamsOnly) {
+            teamsWithPlayers.push({
+              name: teamName,
+              members: cleanMembers.length > 0 ? cleanMembers : ["Participantes não informados"]
+            });
+          }
+        });
+
+        // 2. Pontuações e Rodadas
+        function resolveScore(roundIdx, matchIdx) {
+          if (typeof options.getScore === "function") {
+            return options.getScore(roundIdx, matchIdx);
+          }
+          if (!options.scores) return null;
+          const key = `${roundIdx}-${matchIdx}`;
+          let raw = null;
+          if (options.scores instanceof Map) {
+            raw = options.scores.get(key);
+          } else if (Array.isArray(options.scores)) {
+            const found = options.scores.find(([k]) => k === key);
+            if (found) raw = found[1];
+          } else if (typeof options.scores === "object") {
+            raw = options.scores[key];
+          }
+          if (!raw) return null;
+          if (Array.isArray(raw)) {
+            if (raw[0] !== "" && raw[1] !== "" && raw[0] != null && raw[1] != null) {
+              return { home: String(raw[0]), away: String(raw[1]), isPlayed: true };
+            }
+            return { home: "", away: "", isPlayed: false };
+          }
+          if (typeof raw === "object" && raw.home != null && raw.away != null && raw.home !== "" && raw.away !== "") {
+            return { home: String(raw.home), away: String(raw.away), isPlayed: true };
+          }
+          return null;
+        }
+
+        const roundsToRender = [];
+        schedule.forEach((round, roundIdx) => {
+          const matchItems = [];
+          (round.matches || []).forEach(([home, away], matchIdx) => {
+            const scoreObj = resolveScore(roundIdx, matchIdx);
+            const isPlayed = Boolean(scoreObj?.isPlayed);
+            const scoreStr = isPlayed ? `${scoreObj.home} × ${scoreObj.away}` : "×";
+            if (!options.onlyPlayed || isPlayed) {
+              matchItems.push({ home, away, scoreStr, isPlayed });
+            }
+          });
+
+          if (!options.onlyPlayed || matchItems.length > 0) {
+            roundsToRender.push({
+              roundIdx,
+              matches: matchItems,
+              bye: round.bye
+            });
+          }
+        });
+
+        const W = 580; // 58mm escalado a 10px/mm para excelente nitidez térmica
+        const marginX = 35;
+        const printableW = 510;
+        const endX = marginX + printableW; // 545
+        const centerX = W / 2; // 290
+
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+
+        // Helper para quebra de texto
+        function splitText(text, maxW, font) {
+          ctx.font = font;
+          const words = String(text || "").split(" ");
+          const lines = [];
+          let cur = words[0] || "";
+          for (let i = 1; i < words.length; i++) {
+            const w = words[i];
+            if (ctx.measureText(cur + " " + w).width <= maxW) {
+              cur += " " + w;
+            } else {
+              lines.push(cur);
+              cur = w;
+            }
+          }
+          if (cur) lines.push(cur);
+          return lines;
+        }
+
+        // Função de renderização (passo 1 mede a altura contínua exata, passo 2 desenha os pixels)
+        function renderPass(isMeasuring) {
+          let y = 30; // Margem superior
+
+          // Cabeçalho Principal: VÔLEI HUB
+          if (!isMeasuring) {
+            ctx.fillStyle = "#000000";
+            ctx.font = "bold 26px Arial, Helvetica, sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText("VÔLEI HUB", centerX, y + 12);
+          }
+          y += 28;
+
+          // Linha divisória
+          if (!isMeasuring) {
+            ctx.strokeStyle = "#000000";
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.moveTo(marginX, y);
+            ctx.lineTo(endX, y);
+            ctx.stroke();
+          }
+          y += 18;
+
+          // Título do documento
+          const titleText = String(options.title || "Resultado").toUpperCase();
+          const titleFont = "bold 20px Arial, Helvetica, sans-serif";
+          const titleLines = splitText(titleText, printableW, titleFont);
+          if (!isMeasuring) {
+            ctx.font = titleFont;
+            ctx.fillStyle = "#000000";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "top";
+            titleLines.forEach((tl, i) => {
+              ctx.fillText(tl, centerX, y + i * 26);
+            });
+          }
+          y += titleLines.length * 26 + 6;
+
+          // Subtítulo
+          if (options.subtitle) {
+            const subFont = "bold 15px Arial, Helvetica, sans-serif";
+            const subLines = splitText(String(options.subtitle), printableW, subFont);
+            if (!isMeasuring) {
+              ctx.font = subFont;
+              ctx.fillStyle = "#000000";
+              ctx.textAlign = "center";
+              ctx.textBaseline = "top";
+              subLines.forEach((sl, i) => {
+                ctx.fillText(sl, centerX, y + i * 20);
+              });
+            }
+            y += subLines.length * 20 + 8;
+          }
+
+          // Linha divisória
+          if (!isMeasuring) {
+            ctx.strokeStyle = "#000000";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(marginX, y);
+            ctx.lineTo(endX, y);
+            ctx.stroke();
+          }
+          y += 24;
+
+          // Seção: Classificação Final
+          if (Array.isArray(standings) && standings.length > 0) {
+            if (!isMeasuring) {
+              ctx.fillStyle = "#000000";
+              ctx.fillRect(marginX, y, printableW, 30);
+              ctx.fillStyle = "#ffffff";
+              ctx.font = "bold 16px Arial, Helvetica, sans-serif";
+              ctx.textAlign = "center";
+              ctx.textBaseline = "middle";
+              ctx.fillText("CLASSIFICAÇÃO FINAL", centerX, y + 15);
+            }
+            y += 30;
+
+            const headers = showSaldo
+              ? ["#", "Equipe", "V", "D", "Pts", "SG"]
+              : ["#", "Equipe", "V", "D", "J"];
+            const colWidths = showSaldo
+              ? [48, 222, 60, 60, 60, 60]
+              : [50, 260, 66, 66, 68];
+
+            const headerH = 28;
+            if (!isMeasuring) {
+              ctx.fillStyle = "#e5e5e5";
+              ctx.fillRect(marginX, y, printableW, headerH);
+              let curX = marginX;
+              headers.forEach((h, i) => {
+                ctx.strokeStyle = "#000000";
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(curX, y, colWidths[i], headerH);
+                ctx.fillStyle = "#000000";
+                ctx.font = "bold 14px Arial, Helvetica, sans-serif";
+                ctx.textBaseline = "middle";
+                if (i === 1) {
+                  ctx.textAlign = "left";
+                  ctx.fillText(h, curX + 8, y + headerH / 2);
+                } else {
+                  ctx.textAlign = "center";
+                  ctx.fillText(h, curX + colWidths[i] / 2, y + headerH / 2);
+                }
+                curX += colWidths[i];
+              });
+            }
+            y += headerH;
+
+            const rowH = 30;
+            standings.forEach((team, idx) => {
+              if (!isMeasuring) {
+                const isEven = idx % 2 === 0;
+                ctx.fillStyle = isEven ? "#ffffff" : "#f2f2f2";
+                ctx.fillRect(marginX, y, printableW, rowH);
+
+                const diffVal = team.difference != null ? Number(team.difference) : 0;
+                const diffStr = diffVal >= 0 ? `+${diffVal}` : String(diffVal);
+
+                const cells = showSaldo
+                  ? [
+                      `${idx + 1}º`,
+                      String(team.name || `Equipe ${idx + 1}`),
+                      String(team.wins ?? 0),
+                      String(team.losses ?? 0),
+                      String(team.points ?? 0),
+                      diffStr
+                    ]
+                  : [
+                      `${idx + 1}º`,
+                      String(team.name || `Equipe ${idx + 1}`),
+                      String(team.wins ?? 0),
+                      String(team.losses ?? 0),
+                      String(team.games ?? 0)
+                    ];
+
+                let curX = marginX;
+                cells.forEach((val, i) => {
+                  ctx.strokeStyle = "#000000";
+                  ctx.lineWidth = 1.2;
+                  ctx.strokeRect(curX, y, colWidths[i], rowH);
+                  ctx.fillStyle = "#000000";
+                  ctx.font = "bold 14px Arial, Helvetica, sans-serif";
+                  ctx.textBaseline = "middle";
+                  if (i === 1) {
+                    ctx.textAlign = "left";
+                    let safeName = val;
+                    while (ctx.measureText(safeName).width > colWidths[i] - 14 && safeName.length > 4) {
+                      safeName = safeName.slice(0, -2) + "…";
+                    }
+                    ctx.fillText(safeName, curX + 8, y + rowH / 2);
+                  } else {
+                    ctx.textAlign = "center";
+                    ctx.fillText(val, curX + colWidths[i] / 2, y + rowH / 2);
+                  }
+                  curX += colWidths[i];
+                });
+              }
+              y += rowH;
+            });
+            y += 24;
+
+            if (options.exclusionAlert) {
+              const alertFont = "bold 13px Arial, Helvetica, sans-serif";
+              const alertLines = splitText(String(options.exclusionAlert), printableW - 20, alertFont);
+              const alertH = alertLines.length * 20 + 16;
+              if (!isMeasuring) {
+                ctx.fillStyle = "#fef3c7";
+                ctx.fillRect(marginX, y, printableW, alertH);
+                ctx.strokeStyle = "#000000";
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(marginX, y, printableW, alertH);
+                ctx.fillStyle = "#000000";
+                ctx.font = alertFont;
+                ctx.textAlign = "left";
+                ctx.textBaseline = "top";
+                alertLines.forEach((al, i) => {
+                  ctx.fillText(al, marginX + 10, y + 8 + i * 20);
+                });
+              }
+              y += alertH + 24;
+            }
+          }
+
+          // Seção: Top Jogadores
+          if (topPlayers.length > 0) {
+            if (!isMeasuring) {
+              ctx.fillStyle = "#000000";
+              ctx.fillRect(marginX, y, printableW, 30);
+              ctx.fillStyle = "#ffffff";
+              ctx.font = "bold 16px Arial, Helvetica, sans-serif";
+              ctx.textAlign = "center";
+              ctx.textBaseline = "middle";
+              ctx.fillText("TOP JOGADORES", centerX, y + 15);
+            }
+            y += 38;
+
+            const top10 = topPlayers.slice(0, 10);
+            top10.forEach((p, i) => {
+              if (!isMeasuring) {
+                ctx.fillStyle = "#000000";
+                ctx.font = "bold 15px Arial, Helvetica, sans-serif";
+                ctx.textAlign = "left";
+                ctx.textBaseline = "middle";
+                const itemText = `${i + 1}º ${p.name} (${p.team}) · ${p.points} pts`;
+                ctx.fillText(itemText, marginX + 8, y);
+              }
+              y += 24;
+            });
+            y += 18;
+          }
+
+          // Seção: Participantes por Equipe
+          if (teamsWithPlayers.length > 0) {
+            const isTeamsOnly = Boolean(options.teamsOnly);
+            const sectionH = isTeamsOnly ? 34 : 30;
+            if (!isMeasuring) {
+              ctx.fillStyle = "#000000";
+              ctx.fillRect(marginX, y, printableW, sectionH);
+              ctx.fillStyle = "#ffffff";
+              ctx.font = isTeamsOnly ? "bold 18px Arial, sans-serif" : "bold 16px Arial, sans-serif";
+              ctx.textAlign = "center";
+              ctx.textBaseline = "middle";
+              ctx.fillText("EQUIPES E INTEGRANTES", centerX, y + sectionH / 2);
+            }
+            y += sectionH + 12;
+
+            teamsWithPlayers.forEach((teamObj) => {
+              const headerH = isTeamsOnly ? 36 : 30;
+              if (!isMeasuring) {
+                ctx.fillStyle = "#e5e5e5";
+                ctx.fillRect(marginX, y, printableW, headerH);
+                ctx.fillStyle = "#000000";
+                ctx.font = isTeamsOnly ? "bold 20px Arial, sans-serif" : "bold 17px Arial, sans-serif";
+                ctx.textAlign = "left";
+                ctx.textBaseline = "middle";
+                ctx.fillText(teamObj.name, marginX + 12, y + headerH / 2);
+              }
+              y += headerH + 8;
+
+              const memberH = isTeamsOnly ? 28 : 24;
+              teamObj.members.forEach((member) => {
+                const bulletText = `• ${member}`;
+                const mLines = splitText(bulletText, printableW - 20, isTeamsOnly ? "bold 18px Arial, sans-serif" : "bold 15px Arial, sans-serif");
+                if (!isMeasuring) {
+                  ctx.fillStyle = "#000000";
+                  ctx.font = isTeamsOnly ? "bold 18px Arial, sans-serif" : "bold 15px Arial, sans-serif";
+                  ctx.textAlign = "left";
+                  ctx.textBaseline = "top";
+                  mLines.forEach((ml, mi) => {
+                    ctx.fillText(ml, marginX + 14, y + mi * memberH);
+                  });
+                }
+                y += mLines.length * memberH;
+              });
+
+              y += isTeamsOnly ? 14 : 10;
+              if (!isMeasuring) {
+                ctx.strokeStyle = "#bbbbbb";
+                ctx.lineWidth = 1.2;
+                ctx.beginPath();
+                ctx.moveTo(marginX, y);
+                ctx.lineTo(endX, y);
+                ctx.stroke();
+              }
+              y += isTeamsOnly ? 18 : 14;
+            });
+            y += 10;
+          }
+
+          // Seção: Jogos por Rodada
+          if (roundsToRender.length > 0) {
+            if (!isMeasuring) {
+              ctx.fillStyle = "#000000";
+              ctx.fillRect(marginX, y, printableW, 30);
+              ctx.fillStyle = "#ffffff";
+              ctx.font = "bold 16px Arial, Helvetica, sans-serif";
+              ctx.textAlign = "center";
+              ctx.textBaseline = "middle";
+              ctx.fillText(options.onlyPlayed ? "JOGOS REALIZADOS" : "JOGOS POR RODADA", centerX, y + 15);
+            }
+            y += 40;
+
+            roundsToRender.forEach((roundData) => {
+              const { roundIdx, matches, bye } = roundData;
+              const headerH = 28;
+              const matchLineH = 34;
+              const byeH = bye ? 26 : 0;
+              const cardH = headerH + matches.length * matchLineH + byeH + 12;
+
+              if (!isMeasuring) {
+                // Fundo branco do card
+                ctx.fillStyle = "#ffffff";
+                ctx.fillRect(marginX, y, printableW, cardH);
+                // Borda do card
+                ctx.strokeStyle = "#000000";
+                ctx.lineWidth = 2.5;
+                ctx.strokeRect(marginX, y, printableW, cardH);
+
+                // Topo cinza da rodada
+                ctx.fillStyle = "#e5e5e5";
+                ctx.fillRect(marginX, y, printableW, headerH);
+                ctx.beginPath();
+                ctx.moveTo(marginX, y + headerH);
+                ctx.lineTo(endX, y + headerH);
+                ctx.stroke();
+
+                ctx.fillStyle = "#000000";
+                ctx.font = "bold 15px Arial, Helvetica, sans-serif";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(`Rodada ${roundIdx + 1}`, centerX, y + headerH / 2);
+
+                let curMatchY = y + headerH + 20;
+                matches.forEach(({ home, away, scoreStr }) => {
+                  ctx.fillStyle = "#000000";
+                  ctx.font = "bold 15px Arial, Helvetica, sans-serif";
+                  ctx.textBaseline = "middle";
+
+                  // Time Mandante
+                  ctx.textAlign = "right";
+                  ctx.fillText(String(home), centerX - 42, curMatchY);
+
+                  // Placar central
+                  ctx.textAlign = "center";
+                  ctx.font = "bold 18px Arial, Helvetica, sans-serif";
+                  ctx.fillText(scoreStr, centerX, curMatchY);
+
+                  // Time Visitante
+                  ctx.font = "bold 15px Arial, Helvetica, sans-serif";
+                  ctx.textAlign = "left";
+                  ctx.fillText(String(away), centerX + 42, curMatchY);
+
+                  curMatchY += matchLineH;
+                });
+
+                if (bye) {
+                  ctx.fillStyle = "#000000";
+                  ctx.font = "bold 14px Arial, Helvetica, sans-serif";
+                  ctx.textAlign = "center";
+                  ctx.textBaseline = "middle";
+                  ctx.fillText(`Folga: ${bye}`, centerX, curMatchY - 4);
+                }
+              }
+
+              y += cardH + 22;
+            });
+            y += 8;
+          }
+
+          // Rodapé do Cupom
+          let dateVal = new Date(options.date || Date.now());
+          if (isNaN(dateVal.getTime())) dateVal = new Date();
+          y += 10;
+          if (!isMeasuring) {
+            ctx.fillStyle = "#000000";
+            ctx.font = "bold 14px Arial, Helvetica, sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(`Emitido em: ${dateVal.toLocaleString("pt-BR")}`, centerX, y);
+          }
+          y += 24;
+
+          if (!isMeasuring) {
+            ctx.font = "bold 15px monospace";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -", centerX, y);
+          }
+          y += 30; // Margem para corte do papel
+
+          return y;
+        }
+
+        // 1. Passo de medição para determinar altura contínua exata
+        const calculatedH = renderPass(true);
+        canvas.width = W;
+        canvas.height = Math.max(250, Math.ceil(calculatedH));
+
+        // Fundo 100% branco para contraste térmico
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // 2. Passo de desenho com dimensões finais
+        renderPass(false);
+
+        // Nome do arquivo
+        const pad = (n) => String(n).padStart(2, "0");
+        let d = new Date(options.date || Date.now());
+        if (isNaN(d.getTime())) d = new Date();
+        const datePart = `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()} ${pad(d.getHours())}h${pad(d.getMinutes())}`;
+        const fileName = options.teamsOnly
+          ? `Volei Hub - Times - Cupom 58mm - ${datePart}.png`
+          : `Volei Hub - Cupom 58mm - ${datePart}.png`;
+
+        const dataUrl = canvas.toDataURL("image/png");
+
+        let resolved = false;
+        function finish(blob) {
+          if (resolved) return;
+          resolved = true;
+          let file = null;
+          try {
+            file = new File([blob], fileName, { type: "image/png", lastModified: Date.now() });
+          } catch (_) {
+            file = blob || {};
+          }
+          if (file) {
+            file.name = fileName;
+            file._pdfOptions = options;
+            file._dataUrl = dataUrl;
+          }
+          resolve({ canvas, blob, file, fileName, dataUrl, options });
+        }
+
+        function fallbackBlob() {
+          try {
+            const arr = dataUrl.split(",");
+            const bstr = atob(arr[1]);
+            let n = bstr.length;
+            const u8arr = new Uint8Array(n);
+            while (n--) {
+              u8arr[n] = bstr.charCodeAt(n);
+            }
+            const blob = new Blob([u8arr], { type: "image/png" });
+            finish(blob);
+          } catch (e) {
+            finish(null);
+          }
+        }
+
+        if (typeof canvas.toBlob === "function") {
+          try {
+            canvas.toBlob((blob) => {
+              if (blob) {
+                finish(blob);
+              } else {
+                fallbackBlob();
+              }
+            }, "image/png");
+          } catch (_) {
+            fallbackBlob();
+          }
+        } else {
+          fallbackBlob();
+        }
+      } catch (err) {
+        console.warn("Erro ao gerar Foto do Cupom:", err);
+        resolve({ canvas: null, blob: null, file: null, fileName: "" });
+      }
+    });
+  }
+  window.buildVolleyCupomImage = buildVolleyCupomImage;
+
+  // Gerador de Cupom Térmico 58mm Contínuo (PDF)
   function buildVolleyCupomPdf(options = {}, Pdf) {
     try {
       const standings = options.teamsOnly ? null : options.standings;
@@ -970,6 +1666,10 @@
   }
 
   window.buildVolleyPdf = function (options = {}) {
+    if (options.format === "cupom-img" || options.format === "image" || options.format === "png") {
+      return buildVolleyCupomImage(options);
+    }
+
     const Pdf = window.jspdf?.jsPDF;
     if (!Pdf) {
       console.warn("jsPDF não carregado.");

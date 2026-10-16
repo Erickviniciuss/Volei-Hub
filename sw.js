@@ -1,4 +1,4 @@
-const CACHE_NAME = 'volei-hub-cache-v2.1.1';
+const CACHE_NAME = 'volei-hub-cache-v2.1.2';
 const CORE_ASSETS = [
   './',
   './index.html',
