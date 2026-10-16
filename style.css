@@ -1124,6 +1124,21 @@ html.pdf-modal-active body > *:not(.pdf-share-dialog) {
   background: rgba(168, 85, 247, 0.15);
 }
 
+.pdf-share-opt.opt-bt-print {
+  border-color: rgba(245, 158, 11, 0.4);
+  background: rgba(245, 158, 11, 0.04);
+}
+
+.pdf-share-opt.opt-bt-print:hover {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.pdf-share-opt.opt-bt-print .pdf-opt-icon {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.18);
+}
+
 .pdf-opt-icon {
   display: flex;
   align-items: center;
@@ -1284,6 +1299,145 @@ body[data-theme="dark"] .pdf-fmt-btn.is-active {
   font-size: 0.68rem;
   color: var(--muted);
   white-space: normal;
+}
+
+/* Card de Configuração da Impressora Bluetooth */
+.bt-printer-card {
+  position: relative;
+}
+
+.bt-status-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--soft-card);
+  border: 1.5px solid var(--line);
+  margin-bottom: 14px;
+}
+
+.bt-status-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bt-status-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.bt-status-dot.is-connected {
+  background: #10b981;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.7);
+}
+
+.bt-status-dot.is-connecting {
+  background: #f59e0b;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.7);
+  animation: btPulse 1s infinite alternate;
+}
+
+@keyframes btPulse {
+  0% { transform: scale(0.9); opacity: 0.6; }
+  100% { transform: scale(1.15); opacity: 1; }
+}
+
+.bt-status-text strong {
+  display: block;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.bt-status-text small {
+  display: block;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.bt-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.bt-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+  transition: all 0.2s ease;
+  flex: 1;
+  min-width: 130px;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bt-btn-connect {
+  background: #0284c7;
+  color: #ffffff;
+}
+
+.bt-btn-connect:hover {
+  background: #0369a1;
+  transform: translateY(-1px);
+}
+
+.bt-btn-test {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1.5px solid rgba(16, 185, 129, 0.35);
+}
+
+.bt-btn-test:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: #10b981;
+  transform: translateY(-1px);
+}
+
+.bt-btn-disconnect {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1.5px solid rgba(239, 68, 68, 0.25);
+}
+
+.bt-btn-disconnect:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+  transform: translateY(-1px);
+}
+
+.bt-action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+  transform: none !important;
+}
+
+.bt-compat-alert {
+  padding: 11px 14px;
+  border-radius: 10px;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: var(--ink);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  margin-top: 10px;
 }
 
 /* Responsividade refinada para Mobile */

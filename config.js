@@ -92,6 +92,163 @@ starDrawCard.insertAdjacentElement("afterend", exclusionBalanceCard);
 
 const exclusionBalanceEnabled = document.querySelector("#exclusion-balance-enabled");
 
+// Card 4: Impressora Térmica Bluetooth
+const btPrinterCard = document.createElement("section");
+btPrinterCard.className = "setup-card config-card bt-printer-card";
+btPrinterCard.innerHTML = `
+  <p class="eyebrow">EQUIPAMENTO</p>
+  <h2>Impressora Térmica Bluetooth</h2>
+  <p>Conecte sua mini impressora térmica Bluetooth (MY-7779, POS-58 ou compatível) para impressão rápida de cupons, tabelas e resultados.</p>
+  
+  <div class="bt-status-box">
+    <div class="bt-status-info">
+      <span id="bt-status-dot" class="bt-status-dot"></span>
+      <div class="bt-status-text">
+        <strong id="bt-status-title">Desconectada</strong>
+        <small id="bt-status-sub">Nenhuma impressora conectada no momento</small>
+      </div>
+    </div>
+  </div>
+
+  <div class="bt-actions-row">
+    <button id="bt-connect-btn" class="bt-action-btn bt-btn-connect" type="button">
+      <span>🔍 Conectar Impressora</span>
+    </button>
+    <button id="bt-test-btn" class="bt-action-btn bt-btn-test" type="button" disabled>
+      <span>🧪 Imprimir Teste</span>
+    </button>
+    <button id="bt-disconnect-btn" class="bt-action-btn bt-btn-disconnect" type="button" disabled>
+      <span>Desconectar</span>
+    </button>
+  </div>
+
+  <div class="config-account-form">
+    <label for="bt-paper-width">Largura da bobina</label>
+    <select id="bt-paper-width">
+      <option value="58">58mm (32 colunas - Padrão MY-7779)</option>
+      <option value="80">80mm (48 colunas)</option>
+    </select>
+
+    <label for="bt-print-mode">Modo de impressão</label>
+    <select id="bt-print-mode">
+      <option value="escpos">Texto ESC/POS Ultra-Rápido (Recomendado)</option>
+      <option value="raster">Gráfico Térmico Completo (Raster)</option>
+    </select>
+
+    <label for="bt-line-feed">Avanço final de papel</label>
+    <select id="bt-line-feed">
+      <option value="3">3 linhas</option>
+      <option value="4" selected>4 linhas</option>
+      <option value="6">6 linhas</option>
+    </select>
+  </div>
+
+  <div id="bt-compat-alert" class="bt-compat-alert" hidden>
+    <strong>Nota de Compatibilidade:</strong> A conexão Web Bluetooth é nativa no Google Chrome, Microsoft Edge e Android. Certifique-se de que o Bluetooth do aparelho está ativado e a impressora ligada.
+  </div>
+`;
+exclusionBalanceCard.insertAdjacentElement("afterend", btPrinterCard);
+
+// Elementos e controles do card de impressora bluetooth
+const btStatusDot = document.querySelector("#bt-status-dot");
+const btStatusTitle = document.querySelector("#bt-status-title");
+const btStatusSub = document.querySelector("#bt-status-sub");
+const btConnectBtn = document.querySelector("#bt-connect-btn");
+const btTestBtn = document.querySelector("#bt-test-btn");
+const btDisconnectBtn = document.querySelector("#bt-disconnect-btn");
+const btPaperWidth = document.querySelector("#bt-paper-width");
+const btPrintMode = document.querySelector("#bt-print-mode");
+const btLineFeed = document.querySelector("#bt-line-feed");
+const btCompatAlert = document.querySelector("#bt-compat-alert");
+
+if (window.bluetoothPrinter) {
+  const settings = window.bluetoothPrinter.settings || {};
+  if (btPaperWidth) btPaperWidth.value = String(settings.paperWidth || 58);
+  if (btPrintMode) btPrintMode.value = settings.printMode || "escpos";
+  if (btLineFeed) btLineFeed.value = String(settings.lineFeed || 4);
+
+  btPaperWidth?.addEventListener("change", () => {
+    window.bluetoothPrinter.saveSettings({ paperWidth: Number(btPaperWidth.value) });
+  });
+  btPrintMode?.addEventListener("change", () => {
+    window.bluetoothPrinter.saveSettings({ printMode: btPrintMode.value });
+  });
+  btLineFeed?.addEventListener("change", () => {
+    window.bluetoothPrinter.saveSettings({ lineFeed: Number(btLineFeed.value) });
+  });
+
+  window.bluetoothPrinter.onStatusChange((status) => {
+    if (!status.supported) {
+      if (btCompatAlert) btCompatAlert.hidden = false;
+      if (btConnectBtn) btConnectBtn.disabled = true;
+      if (btStatusTitle) btStatusTitle.textContent = "Bluetooth Não Suportado";
+      if (btStatusSub) btStatusSub.textContent = "Seu navegador não suporta Web Bluetooth (use Chrome ou Edge no Android/PC)";
+      return;
+    }
+
+    if (status.connected) {
+      btStatusDot?.classList.remove("is-connecting");
+      btStatusDot?.classList.add("is-connected");
+      if (btStatusTitle) btStatusTitle.textContent = status.deviceName || "Impressora Conectada";
+      if (btStatusSub) btStatusSub.textContent = "Pronta para imprimir cupons e resultados";
+      if (btConnectBtn) btConnectBtn.hidden = true;
+      if (btTestBtn) btTestBtn.disabled = false;
+      if (btDisconnectBtn) {
+        btDisconnectBtn.disabled = false;
+        btDisconnectBtn.hidden = false;
+      }
+    } else {
+      btStatusDot?.classList.remove("is-connected", "is-connecting");
+      if (btStatusTitle) btStatusTitle.textContent = status.deviceName ? `Pendente: ${status.deviceName}` : "Desconectada";
+      if (btStatusSub) btStatusSub.textContent = status.deviceName ? "Toque em Conectar para reconectar" : "Nenhuma impressora conectada no momento";
+      if (btConnectBtn) {
+        btConnectBtn.hidden = false;
+        btConnectBtn.disabled = false;
+        btConnectBtn.innerHTML = `<span>🔍 Conectar Impressora</span>`;
+      }
+      if (btTestBtn) btTestBtn.disabled = true;
+      if (btDisconnectBtn) {
+        btDisconnectBtn.disabled = true;
+        btDisconnectBtn.hidden = !status.deviceName;
+      }
+    }
+  });
+
+  btConnectBtn?.addEventListener("click", async () => {
+    try {
+      btConnectBtn.disabled = true;
+      btConnectBtn.innerHTML = `<span>Conectando...</span>`;
+      btStatusDot?.classList.add("is-connecting");
+      await window.bluetoothPrinter.connect();
+      showToast("Impressora Bluetooth conectada com sucesso!", "success");
+    } catch (err) {
+      showToast(err.message || "Não foi possível conectar à impressora.", "error");
+    } finally {
+      btConnectBtn.disabled = false;
+      btConnectBtn.innerHTML = `<span>🔍 Conectar Impressora</span>`;
+    }
+  });
+
+  btTestBtn?.addEventListener("click", async () => {
+    try {
+      btTestBtn.disabled = true;
+      btTestBtn.textContent = "Imprimindo...";
+      await window.bluetoothPrinter.printTestTicket();
+      showToast("Cupom de teste impresso com sucesso!", "success");
+    } catch (err) {
+      showToast(err.message || "Erro ao imprimir cupom de teste.", "error");
+    } finally {
+      btTestBtn.disabled = false;
+      btTestBtn.textContent = "🧪 Imprimir Teste";
+    }
+  });
+
+  btDisconnectBtn?.addEventListener("click", async () => {
+    await window.bluetoothPrinter.disconnect();
+    showToast("Impressora desconectada.", "info");
+  });
+}
+
 function updateTieBreakVisibility() {
   tieBreakVisibility.hidden = tieBreakMode.value !== "wins";
   if (quickWinnerOnly.checked) {

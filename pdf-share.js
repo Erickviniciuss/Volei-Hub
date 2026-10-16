@@ -67,6 +67,14 @@
               <small id="pdf-opt-download-sub">Baixa o arquivo no seu dispositivo.</small>
             </div>
           </button>
+
+          <button id="pdf-opt-bt-print" class="pdf-share-opt opt-bt-print" type="button">
+            <span class="pdf-opt-icon" aria-hidden="true">🖨️</span>
+            <div class="pdf-opt-text">
+              <strong id="pdf-opt-bt-title">Imprimir Cupom</strong>
+              <small id="pdf-opt-bt-sub">Envio direto para impressora térmica Bluetooth (MY-7779 / 58mm).</small>
+            </div>
+          </button>
         </div>
 
         <div class="pdf-share-format-selector" id="pdf-share-format-selector">
@@ -582,6 +590,78 @@
         setTimeout(() => closePdfModal(), 1800);
       }
     };
+
+    // 4. Imprimir diretamente na Impressora Térmica Bluetooth (MY-7779 / 58mm / POS-58)
+    const btPrintBtn = modal.querySelector("#pdf-opt-bt-print");
+    const btPrintTitle = modal.querySelector("#pdf-opt-bt-title");
+    const btPrintSub = modal.querySelector("#pdf-opt-bt-sub");
+
+    if (btPrintBtn) {
+      if (window.bluetoothPrinter && window.bluetoothPrinter.isConnected()) {
+        const dName = window.bluetoothPrinter.getDeviceName();
+        if (btPrintSub) btPrintSub.textContent = `Conectada: ${dName}. Toque para imprimir agora.`;
+      }
+
+      btPrintBtn.onclick = async () => {
+        feedbackEl.hidden = true;
+        feedbackEl.textContent = "";
+
+        if (!window.bluetoothPrinter) {
+          feedbackEl.textContent = "Módulo de impressora Bluetooth não carregado.";
+          feedbackEl.className = "pdf-share-feedback is-error";
+          feedbackEl.hidden = false;
+          return;
+        }
+
+        if (!window.bluetoothPrinter.isSupported()) {
+          feedbackEl.innerHTML = `
+            <div style="text-align: left; font-size: 0.8rem; line-height: 1.4;">
+              <strong style="color:var(--ink);">Bluetooth não suportado neste navegador</strong><br/>
+              <small style="color:var(--muted);">A conexão direta requer Google Chrome, Microsoft Edge ou navegador com Web Bluetooth ativado no Android/PC.</small>
+            </div>
+          `;
+          feedbackEl.className = "pdf-share-feedback is-info";
+          feedbackEl.hidden = false;
+          return;
+        }
+
+        try {
+          if (!window.bluetoothPrinter.isConnected()) {
+            feedbackEl.textContent = "Selecione a sua impressora Bluetooth na janela do navegador...";
+            feedbackEl.className = "pdf-share-feedback is-info";
+            feedbackEl.hidden = false;
+            await window.bluetoothPrinter.connect();
+          }
+
+          feedbackEl.textContent = "Enviando dados para a impressora térmica...";
+          feedbackEl.className = "pdf-share-feedback is-info";
+          feedbackEl.hidden = false;
+
+          const optionsToPrint = rawPdfOptions || {
+            title: title || "Vôlei Hub",
+            subtitle: text || "",
+            teamsOnly: Boolean(file?._pdfOptions?.teamsOnly)
+          };
+
+          await window.bluetoothPrinter.printTicketFromOptions(optionsToPrint, (progress) => {
+            feedbackEl.textContent = `Imprimindo cupom... ${progress}%`;
+          });
+
+          feedbackEl.textContent = "Cupom impresso com sucesso na impressora Bluetooth!";
+          feedbackEl.className = "pdf-share-feedback is-success";
+          feedbackEl.hidden = false;
+          setTimeout(() => closePdfModal(), 2200);
+        } catch (err) {
+          if (err && (err.name === "NotFoundError" || err.message?.includes("cancelada"))) {
+            feedbackEl.hidden = true;
+            return;
+          }
+          feedbackEl.textContent = err.message || "Erro ao comunicar com a impressora térmica.";
+          feedbackEl.className = "pdf-share-feedback is-error";
+          feedbackEl.hidden = false;
+        }
+      };
+    }
 
     try {
       if (typeof modal.showModal === "function") {
